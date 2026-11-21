@@ -50,14 +50,14 @@ the graph: say which triples change and why in the PR.
   planning#26), planning#7 (triplestore pulls the release), the release flag in the database
   (planning#27 round 3), a public fixture (from the released `hauptmann2002chemical`) so CI can run
   a whole release without private data.
-- Add this repository to the shared block in knowledge-graph `CLAUDE.md`, then copy it everywhere.
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
 LOD-AM = Linked Open Data for Ancient Metallurgy, a one-person research project (https://lod-am.net).
 - `LOD-AM/knowledge-graph`: data model, vocabularies, converters, data. **Authority for all modelling rules** (`CONVENTIONS.md`).
 - `LOD-AM/triplestore`: Apache Jena Fuseki (Docker) that serves the knowledge graph.
-- `LOD-AM/ingest` (**private**): the owner's research database (dump), converter (R2RML) and its output; the database as a whole stays private until the owner says otherwise.
+- `LOD-AM/ingest` (**private**): the owner's research database (dump), its checks and correction rounds; the database as a whole stays private until the owner says otherwise.
+- `LOD-AM/pipeline`: the data pipeline, code only (database snapshot → R2RML/Ontop → enrichment → checks → released publications); runs on the data LXC, never with data on GitHub.
 - `LOD-AM/website`: Eleventy site and blog, self-hosted.
 - `LOD-AM/planning` (**private**): project management for all repos: one issue per task, state in labels (see its README).
 - `LOD-AM/ontologies`, `vocabularies`, `converter`: **superseded** by knowledge-graph; don't edit.
