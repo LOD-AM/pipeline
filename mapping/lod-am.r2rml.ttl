@@ -1,0 +1,345 @@
+# R2RML mapping: cau database → LOD-AM RDF (issue ingest#14). Patterns: knowledge-graph
+# CONVENTIONS.md. Rules and IRIs are computed in the views (mapping/views.sql, schema
+# lodam_rdf); this file only says which column becomes which triple.
+# Materialise with scripts/materialize.sh (Ontop CLI). Output only to out/ (private).
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix crm:  <http://www.cidoc-crm.org/cidoc-crm/> .
+@prefix geo:  <http://www.opengis.net/ont/geosparql#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix map:  <https://lod-am.net/mapping/> .
+@prefix crmarchaeo: <http://www.cidoc-crm.org/extensions/crmarchaeo/> .
+@prefix crmsci: <http://www.cidoc-crm.org/extensions/crmsci/> .
+@prefix afm:  <http://purl.allotrope.org/ontologies/material#> .
+@prefix afr:  <http://purl.allotrope.org/ontologies/result#> .
+@prefix afx:  <http://purl.allotrope.org/ontologies/property#> .
+@prefix qudt: <http://qudt.org/schema/qudt#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# --- Sites -------------------------------------------------------------------
+map:Site a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site" ] ;
+    rr:subjectMap [ rr:column "site_iri" ; rr:class crm:E27_Site ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ;
+        rr:objectMap [ rr:column "type_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P53_has_former_or_current_location ;
+        rr:objectMap [ rr:column "place_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P1_is_identified_by ;
+        rr:objectMap [ rr:column "name_iri" ; rr:termType rr:IRI ] ] .
+
+# Name as reported: the link to the literature (knowledge-graph CONVENTIONS "Sites")
+map:SiteNameAsReported a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site WHERE name_iri IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "name_iri" ; rr:class crm:E41_Appellation ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ;
+        rr:object <https://lod-am.net/id/name_as_reported> ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P190_has_symbolic_content ;
+        rr:objectMap [ rr:column "as_reported" ] ] .
+
+map:SitePlace a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site" ] ;
+    rr:subjectMap [ rr:column "place_iri" ; rr:class crm:E53_Place, geo:Feature ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ;
+        rr:objectMap [ rr:column "certainty_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P89_falls_within ;
+        rr:objectMap [ rr:column "region_iri" ; rr:termType rr:IRI ] ] .
+
+map:SiteGeometry a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site WHERE wkt IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "geometry_iri" ; rr:class geo:Geometry ] ;
+    rr:predicateObjectMap [ rr:predicate geo:asWKT ;
+        rr:objectMap [ rr:column "wkt" ; rr:datatype geo:wktLiteral ] ] .
+
+map:SitePlaceGeometry a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site WHERE wkt IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "place_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate geo:hasGeometry ;
+        rr:objectMap [ rr:column "geometry_iri" ; rr:termType rr:IRI ] ] .
+
+# --- Regions -----------------------------------------------------------------
+map:Region a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.region" ] ;
+    rr:subjectMap [ rr:column "region_iri" ; rr:class crm:E53_Place, geo:Feature ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] .
+
+# --- Site and feature types (site_interpretation) ------------------------------
+map:SiteType a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site_type" ] ;
+    rr:subjectMap [ rr:column "type_iri" ; rr:class crm:E55_Type, skos:Concept ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] .
+
+map:TypeCloseMatch a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT type_iri, aat_iri FROM lodam_rdf.site_type WHERE aat_match = 'closeMatch'" ] ;
+    rr:subjectMap [ rr:column "type_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate skos:closeMatch ;
+        rr:objectMap [ rr:column "aat_iri" ; rr:termType rr:IRI ] ] .
+
+map:TypeBroadMatch a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT type_iri, aat_iri FROM lodam_rdf.site_type WHERE aat_match = 'broadMatch'" ] ;
+    rr:subjectMap [ rr:column "type_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate skos:broadMatch ;
+        rr:objectMap [ rr:column "aat_iri" ; rr:termType rr:IRI ] ] .
+
+# --- Features (CONVENTIONS "Sites, features, places, periods") -----------------------
+map:Feature a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.feature" ] ;
+    rr:subjectMap [ rr:column "feature_iri" ; rr:class crm:E25_Human-Made_Feature ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ;
+        rr:objectMap [ rr:column "type_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P46i_forms_part_of ;
+        rr:objectMap [ rr:column "site_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P46i_forms_part_of ;
+        rr:objectMap [ rr:column "parent_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P3_has_note ;
+        rr:objectMap [ rr:column "note" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P8i_witnessed ;
+        rr:objectMap [ rr:column "period_iri" ; rr:termType rr:IRI ] ] .
+
+# A feature that contains finds is also a deposit (CRMarchaeo A2), so finds can be AP21i in it
+map:FeatureDeposit a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT feature_iri FROM lodam_rdf.feature WHERE has_finds" ] ;
+    rr:subjectMap [ rr:column "feature_iri" ; rr:class crmarchaeo:A2_Stratigraphic_Volume_Unit ] .
+
+# --- Dating of sites without a feature for their finds (site_period, ingest#8) -------------
+map:SitePeriod a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.site_period" ] ;
+    rr:subjectMap [ rr:column "site_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P8i_witnessed ;
+        rr:objectMap [ rr:column "period_iri" ; rr:termType rr:IRI ] ] .
+
+# --- Periods (zt) and cultures ----------------------------------------------------------
+map:Period a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.period" ] ;
+    rr:subjectMap [ rr:column "period_iri" ; rr:class crm:E4_Period ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P4_has_time-span ;
+        rr:objectMap [ rr:column "time_span_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P9i_forms_part_of ;
+        rr:objectMap [ rr:column "culture_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate skos:inScheme ;
+        rr:objectMap [ rr:column "chronology_iri" ; rr:termType rr:IRI ] ] .
+
+# The culture consists of its phases (both directions stated: no inference)
+map:CulturePhases a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT culture_iri, period_iri FROM lodam_rdf.period" ] ;
+    rr:subjectMap [ rr:column "culture_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P9_consists_of ;
+        rr:objectMap [ rr:column "period_iri" ; rr:termType rr:IRI ] ] .
+
+map:Chronology a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.chronology" ] ;
+    rr:subjectMap [ rr:column "chronology_iri" ; rr:class skos:ConceptScheme ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    # the publication the chronology comes from (owner 2026-11-19; PeriodO collection source)
+    rr:predicateObjectMap [ rr:predicate dcterms:source ;
+        rr:objectMap [ rr:column "publication_iri" ; rr:termType rr:IRI ] ] .
+
+map:PeriodTimeSpan a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.period" ] ;
+    rr:subjectMap [ rr:column "time_span_iri" ; rr:class crm:E52_Time-Span ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P79_beginning_is_qualified_by ;
+        rr:objectMap [ rr:column "begin_year" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P80_end_is_qualified_by ;
+        rr:objectMap [ rr:column "end_year" ] ] .
+
+map:Culture a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.culture" ] ;
+    rr:subjectMap [ rr:column "culture_iri" ; rr:class crm:E4_Period ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] .
+
+# --- Typology (ingest#10): local SKOS concepts in :typology, with AAT matches ------------------
+map:Typology a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.typology" ] ;
+    rr:subjectMap [ rr:column "concept_iri" ; rr:class crm:E55_Type, skos:Concept ] ;
+    rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <https://lod-am.net/id/typology> ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    rr:predicateObjectMap [ rr:predicate skos:broader ;
+        rr:objectMap [ rr:column "broader_iri" ; rr:termType rr:IRI ] ] .
+
+map:TypologyTop a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT concept_iri FROM lodam_rdf.typology WHERE is_top" ] ;
+    rr:subjectMap [ rr:column "concept_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate skos:topConceptOf ; rr:object <https://lod-am.net/id/typology> ] .
+
+map:TypologyCloseMatch a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT concept_iri, aat_iri FROM lodam_rdf.typology WHERE aat_match = 'closeMatch'" ] ;
+    rr:subjectMap [ rr:column "concept_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate skos:closeMatch ;
+        rr:objectMap [ rr:column "aat_iri" ; rr:termType rr:IRI ] ] .
+
+map:TypologyBroadMatch a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT concept_iri, aat_iri FROM lodam_rdf.typology WHERE aat_match = 'broadMatch'" ] ;
+    rr:subjectMap [ rr:column "concept_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate skos:broadMatch ;
+        rr:objectMap [ rr:column "aat_iri" ; rr:termType rr:IRI ] ] .
+
+# --- Finds (CONVENTIONS "Objects", "Converted finds"): local type only, AAT via its match --
+map:Find a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.find" ] ;
+    rr:subjectMap [ rr:column "find_iri" ; rr:class crm:E22_Human-Made_Object ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ;
+        rr:objectMap [ rr:column "type_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crmarchaeo:AP21i_is_contained_in ;
+        rr:objectMap [ rr:column "feature_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P53_has_former_or_current_location ;
+        rr:objectMap [ rr:column "place_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P3_has_note ;
+        rr:objectMap [ rr:column "note" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P45_consists_of ;
+        rr:objectMap [ rr:column "material_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P70i_is_documented_in ;
+        rr:objectMap [ rr:column "publication_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P1_is_identified_by ;
+        rr:objectMap [ rr:column "old_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P1_is_identified_by ;
+        rr:objectMap [ rr:column "drawing_iri" ; rr:termType rr:IRI ] ] .
+
+map:FindOldIdentifier a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT old_iri, old FROM lodam_rdf.find WHERE old_iri IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "old_iri" ; rr:class crm:E42_Identifier ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ; rr:object <https://lod-am.net/id/old_identifier> ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P190_has_symbolic_content ;
+        rr:objectMap [ rr:column "old" ] ] .
+
+map:FindDrawing a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT drawing_iri, drawing FROM lodam_rdf.find WHERE drawing_iri IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "drawing_iri" ; rr:class crm:E42_Identifier ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ; rr:object <https://lod-am.net/id/drawing_number> ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P190_has_symbolic_content ;
+        rr:objectMap [ rr:column "drawing" ] ] .
+
+# --- Labs, object parts --------------------------------------------------------------------
+map:Lab a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.lab" ] ;
+    rr:subjectMap [ rr:column "lab_iri" ; rr:class crm:E74_Group ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate dcterms:identifier ; rr:objectMap [ rr:column "ror_id" ] ] ;
+    rr:predicateObjectMap [ rr:predicate owl:sameAs ; rr:objectMap [ rr:column "ror_iri" ; rr:termType rr:IRI ] ] .
+
+map:PartType a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.part_type" ] ;
+    rr:subjectMap [ rr:column "type_iri" ; rr:class crm:E55_Type, skos:Concept ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] .
+
+map:FindPart a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.find_part" ] ;
+    rr:subjectMap [ rr:column "part_iri" ; rr:class crm:E22_Human-Made_Object ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ; rr:objectMap [ rr:column "type_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P46i_forms_part_of ; rr:objectMap [ rr:column "find_iri" ; rr:termType rr:IRI ] ] .
+
+map:FindHasPart a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT find_iri, part_iri FROM lodam_rdf.find_part" ] ;
+    rr:subjectMap [ rr:column "find_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P46_is_composed_of ; rr:objectMap [ rr:column "part_iri" ; rr:termType rr:IRI ] ] .
+
+# --- Sampling, sample, analysis (CONVENTIONS "Analytics") ------------------------------------
+map:Sampling a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.analysis" ] ;
+    rr:subjectMap [ rr:column "sampling_iri" ; rr:class crmsci:S2_Sample_Taking ] ;
+    rr:predicateObjectMap [ rr:predicate crmsci:O3_sampled_from ; rr:objectMap [ rr:column "sampled_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crmsci:O5_removed ; rr:objectMap [ rr:column "sample_iri" ; rr:termType rr:IRI ] ] .
+
+map:Sample a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.analysis" ] ;
+    rr:subjectMap [ rr:column "sample_iri" ; rr:class crmsci:S13_Sample, afm:AFM_0001099 ] ;   # afm: chemical mixture
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "sample_label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "sample_label_de" ; rr:language "de" ] ] .
+
+map:Analysis a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.analysis" ] ;
+    rr:subjectMap [ rr:column "analysis_iri" ; rr:class crm:E7_Activity ] ;
+    rr:predicateObjectMap [ rr:predicate rdf:type ; rr:objectMap [ rr:column "method_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "label_en" ; rr:language "en" ] ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "label_de" ; rr:language "de" ] ] ;
+    rr:predicateObjectMap [ rr:predicate dcterms:identifier ; rr:objectMap [ rr:column "identifier" ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P14_carried_out_by ; rr:objectMap [ rr:column "lab_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P70i_is_documented_in ; rr:objectMap [ rr:column "publication_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate afx:AFX_0000399 ;                                   # has input
+        rr:objectMap [ rr:column "sample_iri" ; rr:termType rr:IRI ] ] .
+
+# --- Element measurements: mass fraction in wt % (CONVENTIONS "Analytics") --------------------
+map:AnalysisOutput a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT analysis_iri, measurement_iri FROM lodam_rdf.measurement" ] ;
+    rr:subjectMap [ rr:column "analysis_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate afx:AFX_0000395 ;                                   # has output
+        rr:objectMap [ rr:column "measurement_iri" ; rr:termType rr:IRI ] ] .
+
+map:Measurement a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.measurement" ] ;
+    rr:subjectMap [ rr:column "measurement_iri" ; rr:class afr:AFR_0002099 ] ;              # mass fraction
+    rr:predicateObjectMap [ rr:predicate afx:AFX_0002816 ;                                   # quantifies
+        rr:objectMap [ rr:column "element_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate qudt:unit ; rr:object <http://qudt.org/vocab/unit#PERCENT> ] .
+
+map:MeasurementValue a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT measurement_iri, value FROM lodam_rdf.measurement WHERE NOT not_detected" ] ;
+    rr:subjectMap [ rr:column "measurement_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate qudt:numericValue ;
+        rr:objectMap [ rr:column "value" ; rr:datatype xsd:decimal ] ] .
+
+# "Not detected" (knowledge-graph#21): no value, local type, also crm:E54_Dimension
+map:MeasurementNotDetected a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT measurement_iri FROM lodam_rdf.measurement WHERE not_detected" ] ;
+    rr:subjectMap [ rr:column "measurement_iri" ; rr:class crm:E54_Dimension ] ;
+    rr:predicateObjectMap [ rr:predicate crm:P2_has_type ; rr:object <https://lod-am.net/id/not_detected> ] .
+
+# --- Lead isotope ratios (knowledge-graph#14) -------------------------------------------------
+map:IsotopeOutput a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT analysis_iri, ratio_iri FROM lodam_rdf.isotope_ratio" ] ;
+    rr:subjectMap [ rr:column "analysis_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate afx:AFX_0000395 ; rr:objectMap [ rr:column "ratio_iri" ; rr:termType rr:IRI ] ] .
+
+map:IsotopeRatio a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.isotope_ratio" ] ;
+    rr:subjectMap [ rr:column "ratio_iri" ; rr:class afr:AFR_0002368 ] ;                    # analyte molar ratio
+    rr:predicateObjectMap [ rr:predicate afx:AFX_0002816 ;                                   # quantifies (numerator)
+        rr:objectMap [ rr:column "numerator_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate afx:AFX_0001550 ;                                   # has reference (denominator)
+        rr:objectMap [ rr:column "denominator_iri" ; rr:termType rr:IRI ] ] ;
+    rr:predicateObjectMap [ rr:predicate qudt:numericValue ;
+        rr:objectMap [ rr:column "value" ; rr:datatype xsd:decimal ] ] .
+
+# --- Region polygons (GeoSPARQL, like the sites' points) -------------------------------------
+map:RegionGeometry a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.region WHERE wkt IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "geometry_iri" ; rr:class geo:Geometry ] ;
+    rr:predicateObjectMap [ rr:predicate geo:asWKT ; rr:objectMap [ rr:column "wkt" ; rr:datatype geo:wktLiteral ] ] .
+
+map:RegionHasGeometry a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT * FROM lodam_rdf.region WHERE wkt IS NOT NULL" ] ;
+    rr:subjectMap [ rr:column "region_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate geo:hasGeometry ; rr:objectMap [ rr:column "geometry_iri" ; rr:termType rr:IRI ] ] .

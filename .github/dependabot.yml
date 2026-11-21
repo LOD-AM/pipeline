@@ -1,0 +1,24 @@
+# Proposes version bumps of the converter image's inputs as PRs (planning#4). Each bump must
+# pass the image workflow (same graph, same check results) before it is merged.
+version: 2
+updates:
+  - package-ecosystem: docker          # base images in Dockerfile (pinned by digest)
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: ["dependency-updates"]
+  - package-ecosystem: pip             # docker/requirements.txt (rdflib, pyshacl + dependencies, hashes)
+    directory: "/docker"
+    schedule:
+      interval: weekly
+    labels: ["dependency-updates"]
+  - package-ecosystem: maven           # mapping/pom.xml (Ontop CLI, PostgreSQL JDBC driver)
+    directory: "/mapping"
+    schedule:
+      interval: weekly
+    labels: ["dependency-updates"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    labels: ["dependency-updates"]

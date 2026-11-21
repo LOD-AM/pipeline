@@ -1,0 +1,46 @@
+name: ci
+
+# Public CI, without data: the research database is LAN-only and never reaches GitHub
+# (planning#26). Runs against the real database happen on the data LXC (README.md).
+#   test-pipeline  package/publish rules (a failed check never replaces a release; the full graph
+#                  never goes into the release)
+#   image          build image builds, and the same tests pass inside it
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:                    # a new push replaces the run it supersedes
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: "pip install --require-hashes --only-binary=:all: -r docker/requirements.txt"
+      - run: make test-pipeline
+      - run: bash -n scripts/stages/*.sh docker/entrypoint.sh
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --pull --build-arg PIPELINE_IMAGE=lod-am-pipeline:${{ github.sha }} -t lod-am-pipeline:ci .
+      - name: Package tests in the image
+        run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" lod-am-pipeline:ci test-pipeline
+      - name: The image refuses root
+        run: |
+          if docker run --rm --user 0 -v "$PWD:/work" lod-am-pipeline:ci test-pipeline; then
+            echo "FAIL: ran as root"; exit 1
+          fi

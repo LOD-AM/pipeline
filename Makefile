@@ -1,0 +1,57 @@
+# LOD-AM data pipeline (planning#3): research database → Ontop → enrichment → checks → release.
+#   make fetch      network: Zotero snapshot, Ontop + JDBC jars, knowledge-graph ontologies
+#   make snapshot   the live database (read-only role, PG* variables) → out/snapshots/latest.sql
+#   make release    offline: materialize → enrich → check → publish → package
+#                   → out/release/ (released publications + manifest) and out/internal/ (full graph)
+# Each stage can also be run alone (in this order) to debug it; its input is the previous stage's
+# output in out/.build/. Only `package` touches out/release/ and out/internal/, and only after every
+# check passed. Everything in out/ except out/release/ is private: the database as a whole.
+# Env: DUMP (default: out/snapshots/latest.sql), KG=../knowledge-graph, ONTOP_LIB, PG_BIN, WORKDIR=/tmp,
+#      RELEASE_STRICT=1 (server runs). The build image (Dockerfile) sets KG, ONTOP_LIB and PG_BIN.
+DUMP ?=
+KG ?= ../knowledge-graph
+PY ?= python3
+# Ontop jars per mapping/pom.xml version: a changed pom fetches into a new directory, so a stale
+# jar set is never used (old directories can be deleted by hand)
+ONTOP_LIB ?= $(CURDIR)/.cache/ontop/$(shell sha256sum mapping/pom.xml | cut -c1-16)
+export KG ONTOP_LIB
+
+.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot materialize enrich check publish package test-pipeline clean
+
+release: materialize enrich check publish package
+
+fetch: fetch-zotero fetch-ontop fetch-kg
+
+fetch-zotero:        ## owner's public Zotero group → .cache/zotero (+ library version)
+	$(PY) scripts/fetch_zotero.py
+
+fetch-ontop:         ## Ontop CLI + PostgreSQL JDBC driver (Maven Central) → .cache/ontop/<pom hash> (in the image: built in)
+	@if ls $(ONTOP_LIB)/ontop-cli-*.jar > /dev/null 2>&1; then echo "cached: Ontop jars"; \
+	else mvn -q -f mapping/pom.xml dependency:copy-dependencies -DoutputDirectory=$(ONTOP_LIB); fi
+
+fetch-kg:            ## ontologies the knowledge-graph checks need → $(KG)/.cache
+	bash $(KG)/tools/fetch_ontologies.sh
+
+snapshot:            ## live research database (read-only) → out/snapshots/<time>.sql, latest.sql
+	bash scripts/stages/snapshot.sh
+
+materialize:         ## dump → Postgres → views → R2RML → Ontop (out/.build/ontop.ttl, skip report)
+	bash scripts/stages/materialize.sh $(DUMP)
+
+enrich:              ## + literature records from the Zotero snapshot (out/.build/lod-am.ttl)
+	bash scripts/stages/enrich.sh
+
+check:               ## terms, SHACL, source rows vs. output (out/.build/checks.json)
+	bash scripts/stages/check.sh
+
+publish:             ## one checked file per released publication (out/.build/published/)
+	bash scripts/stages/publish.sh
+
+package:             ## → out/release/ + out/internal/ (previous: *.prev/)
+	$(PY) scripts/stages/package.py
+
+test-pipeline:       ## package/publish rules: a failed check never replaces a release (no database)
+	bash scripts/stages/test_pipeline.sh
+
+clean:               ## remove the scratch directory (never a release or a snapshot)
+	rm -rf out/.build

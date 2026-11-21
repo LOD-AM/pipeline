@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fetches the Ontop CLI and the PostgreSQL JDBC driver from Maven Central into
+     .cache/ontop/<hash of this file> (gitignored; `make fetch`) or, in the build image, /opt/ontop/lib.
+     Not a build. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>net.lod-am</groupId>
+  <artifactId>ingest-ontop</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+  <properties>
+    <ontop.version>5.5.0</ontop.version>
+  </properties>
+  <!-- Ontop's own dependency versions (its parent POM), as in the official Ontop CLI. Without them,
+       commons-rdf-rdf4j pulls in rdf4j 2.2.2 jars next to Ontop's rdf4j 5.1.4; which class wins then
+       depends on the directory order of lib/*, and Ontop failed in the build image
+       (NoSuchMethodError in rdf4j IterationWrapper, planning#4). -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>it.unibz.inf.ontop</groupId>
+        <artifactId>ontop</artifactId>
+        <version>${ontop.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>it.unibz.inf.ontop</groupId>
+      <artifactId>ontop-cli</artifactId>
+      <version>${ontop.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.7.4</version>
+    </dependency>
+  </dependencies>
+</project>

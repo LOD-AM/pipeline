@@ -1,0 +1,4 @@
+# Build context of the converter image: tools only, never data (no dump, no out/).
+*
+!docker/
+!mapping/pom.xml
