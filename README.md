@@ -83,3 +83,7 @@ or with the image: `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -
 - `config/released-publications.txt`: stand-in for the database's release flag
 - `Dockerfile`, `docker/`: the build image ([`docker/README.md`](docker/README.md))
 - `.github/workflows/ci.yml`: tests and image build, **without data** (the database never reaches GitHub)
+
+## Licence
+[MIT](LICENSE). The data the pipeline produces is not part of this repository; external ontologies
+and vocabularies are subject to their own licences.

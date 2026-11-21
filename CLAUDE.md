@@ -40,7 +40,7 @@ the graph: say which triples change and why in the PR.
 - Issue references: `ingest#<n>` (private), `planning#<n>` (private), `knowledge-graph#<n>`.
 - Versions are pinned (base images by digest, Python with hashes, Ontop by BOM, knowledge-graph
   by `KG_COMMIT`). Dependabot proposes bumps; bump `KG_COMMIT` by hand, in its own PR.
-- No licence yet: the owner decides (ask before adding one).
+- Licence: MIT (`LICENSE`, owner 2026-11-21), the same text as knowledge-graph's code licence.
 
 ## Where to resume (state 2026-11-21)
 - Moved from ingest (LOD-AM/ingest#47: stages, manifest, build image; verified there: image in CI
