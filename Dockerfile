@@ -12,7 +12,7 @@
 # deliberate change (new shapes can reject data): change KG_COMMIT in its own PR.
 
 # Ontop CLI + PostgreSQL JDBC driver, at the versions in mapping/pom.xml
-FROM maven:3.9.16-eclipse-temurin-17@sha256:1a352420f7aba21f5ad08df31bab55f74c013fb491f1ae8ab1dd7ff9ed698584 AS ontop
+FROM maven:3.9-eclipse-temurin-26@sha256:b2c1ad85954592f9928e84327c65201f308ad9b5d8ed7d5b823717c97bf23fbb AS ontop
 COPY mapping/pom.xml /build/pom.xml
 RUN mvn -q -f /build/pom.xml dependency:copy-dependencies -DoutputDirectory=/opt/ontop/lib \
  && ls /opt/ontop/lib/ontop-cli-*.jar /opt/ontop/lib/postgresql-*.jar
