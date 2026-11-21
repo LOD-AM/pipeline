@@ -22,7 +22,7 @@ FROM eclipse-temurin:17.0.20.1_1-jre@sha256:4faa9eaf440514dd4f7ef71fecb92526e136
 
 # PostgreSQL 16 + PostGIS 3.6 (Debian trixie); materialize loads the dump into a throwaway cluster.
 # (16-3.5 is still Debian bullseye, whose PostgreSQL apt repository is gone.)
-FROM postgis/postgis:16-3.6@sha256:d07ce3f06f657b6516c7511412232e97174d7e9dcf4c9fe520109b682b44a201
+FROM postgis/postgis:18-3.7@sha256:fe440a27c6567aefa932e988962e5827bb2c29e4b97dac2ca5268f5eafe10262
 ARG KG_COMMIT=be9a5f3d60b5403d1927be867d725c9115409147
 ARG KG_REPO=https://github.com/LOD-AM/knowledge-graph
 
