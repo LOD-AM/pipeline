@@ -18,7 +18,7 @@ RUN mvn -q -f /build/pom.xml dependency:copy-dependencies -DoutputDirectory=/opt
  && ls /opt/ontop/lib/ontop-cli-*.jar /opt/ontop/lib/postgresql-*.jar
 
 # Java runtime for Ontop
-FROM eclipse-temurin:17.0.20.1_1-jre@sha256:4faa9eaf440514dd4f7ef71fecb92526e13679aea039bed5d2fc98e885c60dee AS jre
+FROM eclipse-temurin:24.0.2_12-jre@sha256:8cb2387a28af84cf0db0948d9c67d4480192f4e567027a3963f145d218e8b4f2 AS jre
 
 # PostgreSQL 16 + PostGIS 3.6 (Debian trixie); materialize loads the dump into a throwaway cluster.
 # (16-3.5 is still Debian bullseye, whose PostgreSQL apt repository is gone.)
