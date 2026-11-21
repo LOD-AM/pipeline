@@ -1,0 +1,13 @@
+# Template, one copy per language in lodam_rdf.site_native_label (@LANG@ replaced by
+# scripts/materialize.sh): R2RML only has a constant rr:language per term map.
+map:SiteNativeLabel_@LANG@ a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT site_iri, label FROM lodam_rdf.site_native_label WHERE lang = '@LANG@'" ] ;
+    rr:subjectMap [ rr:column "site_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label" ; rr:language "@LANG@" ] ] .
+
+map:LabNativeLabel_@LANG@ a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery "SELECT lab_iri, label_native FROM lodam_rdf.lab WHERE native_lang = '@LANG@'" ] ;
+    rr:subjectMap [ rr:column "lab_iri" ] ;
+    rr:predicateObjectMap [ rr:predicate rdfs:label ;
+        rr:objectMap [ rr:column "label_native" ; rr:language "@LANG@" ] ] .
