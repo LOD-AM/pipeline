@@ -3,7 +3,7 @@ name: ci
 # Public CI, without data: the research database is LAN-only and never reaches GitHub
 # (planning#26). Runs against the real database happen on the data LXC (README.md).
 #   test-pipeline  package/publish rules (a failed check never replaces a release; the full graph
-#                  never goes into the release)
+#                  never goes into the release), deploy/run.sh control flow, shellcheck
 #   image          build image builds, and the same tests pass inside it
 on:
   pull_request:
@@ -28,7 +28,9 @@ jobs:
           python-version: "3.13"
       - run: "pip install --require-hashes --only-binary=:all: -r docker/requirements.txt"
       - run: make test-pipeline
-      - run: bash -n scripts/stages/*.sh docker/entrypoint.sh
+      - run: bash -n scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+      - run: shellcheck -S warning scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh   # preinstalled on ubuntu-latest
+      - run: make test-deploy
 
   image:
     runs-on: ubuntu-latest
