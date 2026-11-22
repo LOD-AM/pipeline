@@ -20,7 +20,11 @@ Selection, starting from the publication (found by its citation key, dcterms:ide
      feature never pulls in further finds of other publications.
 External resources (AAT, ChEBI, Wikidata, ROR, QUDT, ...) are kept as link targets only.
 
-Usage: scripts/export_publication.py <out/release/lod-am.ttl> <citation-key> <dest.ttl>
+Usage: scripts/export_publication.py <out/release/lod-am.ttl> <citation-key> <dest.ttl> [<prefixes.ttl>]
+With knowledge-graph's tools/prefixes.ttl (scripts/stages/publish.sh passes it) the file uses the
+canonical prefixes (crmsci:, afx:, qudt:, ...) instead of the ns1:, ns2: the converter output carries.
+Their numbering changes from run to run, so without it a release with the same triples is a different
+file every time (and the website gets a pull request for nothing, website#21).
 The result is checked like the full output (scripts/export_publication.sh). Write it to out/
 (private) first; it goes to the public website only as released by the owner.
 """
@@ -36,6 +40,7 @@ BASE = "https://lod-am.net/id/"
 SAMPLING_LINKS = (CRMSCI.O3_sampled_from, CRMSCI.O5_removed)
 
 src, key, dest = sys.argv[1:4]
+prefixes = sys.argv[4] if len(sys.argv) > 4 else None
 g = Graph().parse(src, format="turtle")
 
 pubs = [s for s in g.subjects(DCTERMS.identifier, Literal(key))]
@@ -77,9 +82,14 @@ while todo:
             if s not in selected:
                 todo.append(s)
 
-out = Graph()
-for prefix, ns in g.namespaces():
-    out.bind(prefix, ns, override=True)
+out = Graph(bind_namespaces="none")
+if prefixes:  # canonical prefixes; the serializer writes only those that are used
+    for prefix, ns in sorted(Graph().parse(prefixes, format="turtle").namespaces(), key=lambda x: (x[0] == "lodam", x[0])):
+        if prefix != "lodam":       # same namespace as ":"; one name per namespace
+            out.bind(prefix, ns, override=True, replace=True)
+else:
+    for prefix, ns in g.namespaces():
+        out.bind(prefix, ns, override=True)
 for node in selected:
     for p, o in g.predicate_objects(node):
         out.add((node, p, o))
