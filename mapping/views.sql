@@ -24,7 +24,7 @@ SELECT iri('site', s.id_uuid)                          AS site_iri,
        clean(s.site_latin)                             AS label_en,
        CASE WHEN si.id_uuid IS NOT NULL THEN iri('type', si.id_uuid) END AS type_iri,
        CASE WHEN r.id_uuid  IS NOT NULL THEN iri('region', r.id_uuid) END AS region_iri,
-       replace(ST_AsText(g.geography::geometry), 'POINT(', 'POINT (') AS wkt,
+       replace(ST_AsText(s.geometry::geometry), 'POINT(', 'POINT (') AS wkt,   -- site.geometry (planning#27 round 5)
        -- name as reported (knowledge-graph CONVENTIONS "Sites"): an E41_Appellation
        CASE WHEN clean(s.site_as_reported) IS NOT NULL THEN iri('site', s.id_uuid) || '/name_as_reported' END AS name_iri,
        clean(s.site_as_reported)                       AS as_reported,
@@ -33,7 +33,6 @@ SELECT iri('site', s.id_uuid)                          AS site_iri,
 FROM cau.site s
 LEFT JOIN cau.context_type si USING (context_type_id)
 LEFT JOIN cau.region r USING (region_id)
-LEFT JOIN cau.geography g USING (geography_id)
 WHERE clean(s.site_latin) IS NOT NULL;
 
 CREATE VIEW site_native_label AS
@@ -275,8 +274,8 @@ SELECT 'site' AS source_table, s.site_id::text AS source_key, 'no site_latin (no
 FROM cau.site s WHERE clean(s.site_latin) IS NULL
 UNION ALL
 SELECT 'site', s.site_id::text, 'no geometry'
-FROM cau.site s LEFT JOIN cau.geography g USING (geography_id)
-WHERE clean(s.site_latin) IS NOT NULL AND g.geography IS NULL
+FROM cau.site s
+WHERE clean(s.site_latin) IS NOT NULL AND s.geometry IS NULL
 UNION ALL
 SELECT 'period', z.period_id::text, 'no min/max (no time-span)'
 FROM cau.period z WHERE z.min IS NULL OR z.max IS NULL;
