@@ -288,6 +288,8 @@ map:Analysis a rr:TriplesMap ;
     rr:predicateObjectMap [ rr:predicate dcterms:identifier ; rr:objectMap [ rr:column "identifier" ] ] ;
     rr:predicateObjectMap [ rr:predicate crm:P14_carried_out_by ; rr:objectMap [ rr:column "lab_iri" ; rr:termType rr:IRI ] ] ;
     rr:predicateObjectMap [ rr:predicate crm:P70i_is_documented_in ; rr:objectMap [ rr:column "publication_iri" ; rr:termType rr:IRI ] ] ;
+    # remarks of the source (owner 2026-11-22, planning#27 round 3), as for finds
+    rr:predicateObjectMap [ rr:predicate crm:P3_has_note ; rr:objectMap [ rr:column "note" ] ] ;
     rr:predicateObjectMap [ rr:predicate afx:AFX_0000399 ;                                   # has input
         rr:objectMap [ rr:column "sample_iri" ; rr:termType rr:IRI ] ] .
 

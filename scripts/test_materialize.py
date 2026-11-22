@@ -113,7 +113,7 @@ TYPOLOGY = ("SELECT id_uuid FROM cau.type UNION ALL SELECT id_uuid FROM cau.type
 local_e55 = {s for s in g.subjects(RDF.type, CRM.E55_Type) if str(s).startswith(BASE + "type/")}
 same("site/feature types and typology (E55_Type)",
      iris("type", "SELECT id_uuid FROM cau.context_type") | iris("type", TYPOLOGY)
-     | iris("type", "SELECT id_uuid FROM cau.part WHERE part_id <> 0"), local_e55)
+     | iris("type", "SELECT id_uuid FROM cau.part WHERE code IS DISTINCT FROM 'whole_object'"), local_e55)
 TYPOLOGY_IRI = URIRef(BASE + "typology")
 same("typology concepts in :typology", iris("type", TYPOLOGY), set(g.subjects(SKOS.inScheme, TYPOLOGY_IRI)))
 exp_broader = set()
@@ -184,10 +184,11 @@ finds = iris("find", "SELECT id_uuid FROM cau.find")
 parts = {URIRef(f"{BASE}find/{u}/{p}") for u, p in sql(
     "SELECT DISTINCT x.id_uuid, lower(replace(pt.part_en, ' ', '_')) FROM (SELECT site_id, find_id, part_id FROM cau.chemical_analysis "
     "UNION SELECT site_id, find_id, part_id FROM cau.lead_isotope_analysis) a JOIN cau.find x USING (site_id, find_id) "
-    "JOIN cau.part pt USING (part_id) WHERE a.part_id <> 0")}
+    "JOIN cau.part pt USING (part_id) WHERE pt.code IS DISTINCT FROM 'whole_object'")}
 same("finds and object parts (E22)", finds | parts, set(g.subjects(RDF.type, CRM["E22_Human-Made_Object"])))
-same("material of analysed copper-base finds (P45)", iris("find", "SELECT DISTINCT x.id_uuid FROM cau.find x JOIN cau.chemical_analysis c "
-     "USING (site_id, find_id) WHERE c.material_id = 1"), set(g.subjects(CRM.P45_consists_of, URIRef("http://vocab.getty.edu/aat/300241441"))))
+same("material of the finds (P45, find.material_id → its AAT id)", {(URIRef(f"{BASE}find/{u}"), URIRef(f"http://vocab.getty.edu/aat/{a}")) for u, a in sql(
+     "SELECT x.id_uuid, m.aat_id FROM cau.find x JOIN cau.material m USING (material_id) WHERE m.aat_id IS NOT NULL")},
+     set(g.subject_objects(CRM.P45_consists_of)))
 for x in finds:
     if not any(isinstance(o, Literal) and o.language == "en" for o in g.objects(x, RDFS.label)):
         errors.append(f"{x}: no @en label")
@@ -223,19 +224,25 @@ QUDT = Namespace("http://qudt.org/schema/qudt#")
 CRMS = Namespace("http://www.cidoc-crm.org/extensions/crmsci/")
 analyses = iris("analysis", "SELECT id_uuid FROM cau.chemical_analysis UNION ALL SELECT id_uuid FROM cau.lead_isotope_analysis")
 same("analyses (E7)", analyses, set(g.subjects(RDF.type, CRM.E7_Activity)))
+same("remarks of analyses as notes (P3, owner 2026-11-22)", {(URIRef(f"{BASE}analysis/{u}"), Literal(n)) for u, n in sql(
+     "SELECT id_uuid, btrim(remarks) FROM cau.chemical_analysis WHERE btrim(coalesce(remarks, '')) <> '' "
+     "UNION ALL SELECT id_uuid, btrim(remarks) FROM cau.lead_isotope_analysis WHERE btrim(coalesce(remarks, '')) <> ''")},
+     {(a, n) for a, n in g.subject_objects(CRM.P3_has_note) if str(a).startswith(BASE + "analysis/")})
 same("samples (S13), one per analysis", {URIRef(f"{a}/sample") for a in analyses}, set(g.subjects(RDF.type, CRMS.S13_Sample)))
 same("analysis → sample (has input)", {(a, URIRef(f"{a}/sample")) for a in analyses}, set(g.subject_objects(AFX.AFX_0000399)))
 same("analysis → lab", {(URIRef(f"{BASE}analysis/{a}"), URIRef(f"{BASE}lab/{l}")) for a, l in sql(
      "SELECT a.id_uuid, l.id_uuid FROM (SELECT id_uuid, lab_id FROM cau.chemical_analysis UNION ALL SELECT id_uuid, lab_id FROM cau.lead_isotope_analysis) a "
      "JOIN cau.lab l USING (lab_id)")}, set(g.subject_objects(CRM.P14_carried_out_by)))
 ELEMENTS = ["cu", "sn", "pb", "zn", "bi", "ag", "sb", "as", "fe", "ni", "co", "mn", "au", "p", "te", "se", "s"]
-rows = sql("SELECT id_uuid, literature_id, material_id, " + ", ".join(f'coalesce("{e}"::text, \'-\')' for e in ELEMENTS) + " FROM cau.chemical_analysis")
-analysed = {(r[1], e) for r in rows for i, e in enumerate(ELEMENTS) if r[3 + i] != "-"}
+rows = sql("SELECT c.id_uuid, c.literature_id, coalesce(m.code, ''), " + ", ".join(f'coalesce(c."{e}"::text, \'-\')' for e in ELEMENTS)
+           + " FROM cau.chemical_analysis c JOIN cau.find x USING (site_id, find_id) LEFT JOIN cau.material m ON m.material_id = x.material_id")
+# which elements each publication analysed: the owner's list (cau.analysed_element, planning#27 round 3)
+analysed = {(r[0], r[1]) for r in sql("SELECT literature_id, element_code FROM cau.analysed_element")}
 exp_value, exp_nd = {}, set()
 for r in rows:
     for i, e in enumerate(ELEMENTS):
         v = r[3 + i]
-        if e == "cu" and r[2] == "1":
+        if e == "cu" and r[2] == "copper_base":
             continue                                  # all Cu of copper-base objects dropped (ingest#4)
         m = URIRef(f"{BASE}analysis/{r[0]}/{e}")
         if v != "-":

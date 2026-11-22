@@ -20,7 +20,7 @@ echo "old release" > "$T/out/release/marker"
 B=$T/out/.build
 printf '%s\n' '@prefix ex: <https://example.invalid/> .' 'ex:a ex:p ex:b .' 'ex:b ex:p "x" .' 'ex:c ex:p ex:a .' > "$B/lod-am.ttl"
 printf '%s\n' '@prefix ex: <https://example.invalid/> .' 'ex:a ex:p ex:b .' > "$B/published/pub1.ttl"
-echo '{"selected_from": "config", "publications": [{"key": "pub1", "file": "published/pub1.ttl", "shacl": {"violations": 0, "warnings": 0}}]}' > "$B/published.json"
+echo '{"selected_from": "database", "publications": [{"key": "pub1", "file": "published/pub1.ttl", "shacl": {"violations": 0, "warnings": 0}}]}' > "$B/published.json"
 echo "-- dump" > "$T/snap/20260101T000000Z.sql"; echo "$T/snap/20260101T000000Z.sql" > "$B/dump.path"
 echo "source_table,source_key,reason" > "$B/skip-report.csv"
 echo "Conforms: True" > "$B/shacl.txt"; : > "$B/shacl-warnings.txt"; echo "ok   3 triples" > "$B/test_materialize.txt"
@@ -75,7 +75,7 @@ grep -q "does not match" "$T/log" || { echo "FAIL 5: wrong refusal"; cat "$T/log
 rm -f "$T/snap/20260101T000000Z.json"
 echo "ok   5 snapshot not matching its metadata → no release"
 
-echo '{"selected_from": "config", "publications": []}' > "$B/published.json"
+echo '{"selected_from": "database", "publications": []}' > "$B/published.json"
 if pkg > "$T/log" 2>&1; then echo "FAIL 6: packaged without a released publication"; exit 1; fi
 [ "$before" = "$(sha256sum "$T/out/release/manifest.json")" ] || { echo "FAIL 6: release changed"; exit 1; }
 echo "ok   6 no released publication → no release"

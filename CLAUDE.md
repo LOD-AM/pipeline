@@ -14,8 +14,7 @@ as a fresh start without ingest's history (that history contains the database du
 - Only `out/release/` may leave the server, and it holds only released publications. Never put the
   full graph or figures about it (triple counts, skip or SHACL counts) into the release.
 - Which publications are released is the owner's decision, recorded in the database
-  (`cau.literature.released_on`, planning#27; until then `config/released-publications.txt`).
-  Change that file only on the owner's word.
+  (`cau.literature.released_on`, planning#27 round 3). Set or change it only on the owner's word.
 
 ## Checks
 ```bash
