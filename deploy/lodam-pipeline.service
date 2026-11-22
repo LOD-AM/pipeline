@@ -10,7 +10,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=@DIR@/deploy/run.sh
-# A run takes ~12 minutes today; give it room as the database grows (README "Memory")
+# A run takes ~40 minutes on the data LXC today (SHACL ~32 min); room to grow (README "Memory")
 TimeoutStartSec=3h
 # Leave the CPU and disk to interactive work (pgAdmin, Postgres) while it runs
 Nice=10

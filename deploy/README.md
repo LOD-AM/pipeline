@@ -25,8 +25,8 @@ has at least **3 GB RAM + 1 GB swap** (README "Memory").
 ```bash
 cd ~/pipeline && git pull
 sudo deploy/install.sh                       # writes and enables lodam-pipeline.service + .timer
-sudo systemctl start --no-block lodam-pipeline   # optional: run once now (about 12 minutes)
-journalctl -u lodam-pipeline -f              # follow the log
+sudo systemctl start --no-block lodam-pipeline   # optional: run once now (about 40 minutes)
+sudo journalctl -u lodam-pipeline -f         # follow the log (or join the systemd-journal group)
 ```
 `install.sh` writes the units with this checkout's path and changes nothing else. Run it again
 after a change in `deploy/`. Undo: `sudo deploy/install.sh --remove`.
@@ -35,10 +35,11 @@ after a change in `deploy/`. Undo: `sudo deploy/install.sh --remove`.
 | | |
 |---|---|
 | Next run | `systemctl list-timers lodam-pipeline.timer` |
-| Run now | `sudo systemctl start --no-block lodam-pipeline` (`start` without `--no-block` waits ~12 min) |
+| Run now | `sudo systemctl start --no-block lodam-pipeline` (`start` without `--no-block` waits until the run is done) |
 | Release although nothing changed | `sudo deploy/run.sh --force` |
-| Log of the last run | `journalctl -u lodam-pipeline -e` (lines start with `pipeline-run:`, peak memory with `resources:`) |
+| Log of the last run | `sudo journalctl -u lodam-pipeline -e` (lines start with `pipeline-run:`, peak memory per step with `resources:`) |
 | Did the last run fail? | `systemctl status lodam-pipeline` |
+| Stop a run | `sudo systemctl stop lodam-pipeline` (`restart` also stops the running one; the live release stays) |
 | Time | `OnCalendar` in `lodam-pipeline.timer` (default 03:17 ± 15 min); then `sudo deploy/install.sh` again |
 
 **Memory:** every release records the peak memory and duration of each step in
