@@ -27,9 +27,9 @@ fi
 
 for key in $keys; do
   [[ $key =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "FAIL: odd citation key: $key" >&2; exit 1; }
-  python3 scripts/export_publication.py "$BUILD/lod-am.ttl" "$key" "$OUTDIR/$key.tmp.ttl"
-  python3 "$KG/tools/check_terms.py" "$OUTDIR/$key.tmp.ttl"
-  if ! python3 "$KG/tools/validate.py" "$OUTDIR/$key.tmp.ttl" "$KG/data/vocab" > "$OUTDIR/$key.shacl"; then
+  measure "export $key" python3 scripts/export_publication.py "$BUILD/lod-am.ttl" "$key" "$OUTDIR/$key.tmp.ttl"
+  measure "check_terms $key" python3 "$KG/tools/check_terms.py" "$OUTDIR/$key.tmp.ttl"
+  if ! measure "shacl $key" python3 "$KG/tools/validate.py" "$OUTDIR/$key.tmp.ttl" "$KG/data/vocab" > "$OUTDIR/$key.shacl"; then
     grep -v '^warning:' "$OUTDIR/$key.shacl" | head -40; echo "FAIL: SHACL violations in $key" >&2; exit 1
   fi
   tail -1 "$OUTDIR/$key.shacl"

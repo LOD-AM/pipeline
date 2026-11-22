@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2034  # sourced by the stages, which use these variables
 # Shared settings of the converter stages (planning#5); sourced, not run.
 # Env: KG=../knowledge-graph (checkout with .cache/ from its `make fetch`), PG_BIN, WORKDIR=/tmp
 set -euo pipefail
@@ -14,6 +15,8 @@ BUILD=$ROOT/out/.build      # scratch: stages pass their results here; nothing h
 SNAP=$ROOT/out/snapshots    # database snapshots (private, stay on the server)
 PSQL="psql -h $WORK -p $PORT -U postgres -v ON_ERROR_STOP=1 -q"
 DBURL="postgresql://postgres@127.0.0.1:$PORT/$DB"
+# measure <step> <command ...>: run a heavy step, record its peak memory and duration (out/.build/resources.jsonl)
+measure() { local step=$1; shift; python3 "$ROOT/scripts/stages/measure.py" "$step" -- "$@"; }
 
 # The libpq variables from .env (PGHOST, PGDATABASE, PGPASSWORD, ...) describe the live research
 # database and are for the snapshot stage only. Every other stage talks to the throwaway cluster,
