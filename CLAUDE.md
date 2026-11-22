@@ -44,19 +44,21 @@ the graph: say which triples change and why in the PR.
   by `KG_COMMIT`). Dependabot proposes bumps; bump `KG_COMMIT` by hand, in its own PR.
 - Licence: MIT (`LICENSE`, owner 2026-11-21), the same text as knowledge-graph's code licence.
 
-## Where to resume (state 2026-11-22)
+## Where to resume (state 2026-11-22, evening)
 - Moved from ingest (LOD-AM/ingest#47: stages, manifest, build image; verified there: image in CI
   gave the same graph as local runs, canonical sha256 `b82fc318…`, 331,903 triples). New here:
   `snapshot` and `publish` stages, release = released publications only, `out/internal/`.
 - Data LXC (owner, 2026-11-22): read-only role, Docker, first complete run by hand: full graph
   `canonical_sha256` `b82fc318…`, 331,903 triples, identical to the ingest dump's graph. The first attempt was
   killed for lack of memory (exit 137 in the term check at 1 GB); the LXC now has 3 GB RAM + 1 GB swap. Scheduled run: `deploy/` (planning#6), installed by the owner with `deploy/install.sh`.
-- planning#7: `deploy/run.sh` copies each release to `LODAM_PUBLISH_DIR` (/srv/lodam/release, world-readable) and
-  signals the triplestore's webhook (POST /lodam-release, bearer token, `{"manifest_sha256"}`); the triplestore pulls
-  with rsync over SSH (`rrsync -ro`, LOD-AM/triplestore `scripts/update_published.sh`).
-- Next: the release flag in the database
-  (planning#27 round 3), a public fixture (from the released `hauptmann2002chemical`) so CI can run
-  a whole release without private data.
+- Chain live since 2026-11-22 (planning#3): nightly run 03:17 → `deploy/run.sh` copies each release to
+  `LODAM_PUBLISH_DIR` (/srv/lodam/release, world-readable) → webhook POST /lodam-release (bearer token,
+  `{"manifest_sha256"}`) → the triplestore pulls with rsync over SSH (`rrsync -ro`, LOD-AM/triplestore
+  `scripts/update_published.sh`), loads it and hands it to the website as a "Data release" PR. Peak memory
+  1.27 GB (SHACL), a run takes ~40 min. Exports use knowledge-graph's canonical prefixes (#14), so the same
+  triples give the same file. Still to confirm (planning#33): a run with nothing new ends with `unchanged`.
+- Next: the release flag in the database (planning#27 round 3), alerts on failure (planning#34), a public
+  fixture (from the released `hauptmann2002chemical`) so CI can run a whole release without private data.
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
