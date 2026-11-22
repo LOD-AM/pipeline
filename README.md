@@ -57,6 +57,18 @@ GRANT SELECT ON ALL SEQUENCES IN SCHEMA cau TO lodam_pipeline;   -- pg_dump read
 ALTER DEFAULT PRIVILEGES IN SCHEMA cau GRANT SELECT ON TABLES TO lodam_pipeline;
 ALTER DEFAULT PRIVILEGES IN SCHEMA cau GRANT SELECT ON SEQUENCES TO lodam_pipeline;
 ```
+Run the grants **in the research database itself** (pgAdmin: right-click that database → Query
+Tool; `SELECT current_database();` shows where you are). `CREATE ROLE` works from any database, so
+the role shows up even when the grants went elsewhere, and `pg_dump` then fails with
+`permission denied for schema cau`. Check (all three `true`):
+```sql
+SELECT has_schema_privilege('lodam_pipeline', 'cau', 'USAGE'),
+       has_table_privilege('lodam_pipeline', 'cau.site', 'SELECT'),
+       has_table_privilege('lodam_pipeline', 'cau.site', 'UPDATE') = false;
+```
+**After re-importing a dump** that drops and recreates schema `cau` (the correction rounds of
+planning#27), the grants are gone: run the `GRANT` and `ALTER DEFAULT PRIVILEGES` lines again.
+
 Then:
 ```bash
 git clone https://github.com/LOD-AM/pipeline ~/pipeline && cd ~/pipeline

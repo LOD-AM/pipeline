@@ -6,7 +6,8 @@
 #   3. the same graph in another triple order → the same canonical hash;
 #   4. RELEASE_STRICT=1 refuses untraceable inputs (no git, a dump file that is not a snapshot);
 #   5. a snapshot that does not match its .json → no release;
-#   6. no released publication → no release.
+#   6. no released publication → no release;
+#   7. the live database's PG* variables reach only the snapshot stage.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
@@ -73,3 +74,10 @@ echo '{"selected_from": "config", "publications": []}' > "$B/published.json"
 if pkg > "$T/log" 2>&1; then echo "FAIL 6: packaged without a released publication"; exit 1; fi
 [ "$before" = "$(sha256sum "$T/out/release/manifest.json")" ] || { echo "FAIL 6: release changed"; exit 1; }
 echo "ok   6 no released publication → no release"
+
+# 7. The live database's PG* variables (.env) reach only the snapshot stage
+out=$(PGDATABASE=lodam PGPASSWORD=x bash -c 'source scripts/stages/common.sh; echo "${PGDATABASE:-unset} ${PGPASSWORD:-unset}"')
+[ "$out" = "unset unset" ] || { echo "FAIL 7: PG* variables leak into the build stages ($out)"; exit 1; }
+out=$(PGDATABASE=lodam bash -c 'LODAM_STAGE=snapshot; source scripts/stages/common.sh; echo "${PGDATABASE:-unset}"')
+[ "$out" = "lodam" ] || { echo "FAIL 7: snapshot stage lost PGDATABASE ($out)"; exit 1; }
+echo "ok   7 PG* variables only in the snapshot stage"

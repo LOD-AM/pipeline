@@ -15,6 +15,14 @@ SNAP=$ROOT/out/snapshots    # database snapshots (private, stay on the server)
 PSQL="psql -h $WORK -p $PORT -U postgres -v ON_ERROR_STOP=1 -q"
 DBURL="postgresql://postgres@127.0.0.1:$PORT/$DB"
 
+# The libpq variables from .env (PGHOST, PGDATABASE, PGPASSWORD, ...) describe the live research
+# database and are for the snapshot stage only. Every other stage talks to the throwaway cluster,
+# where an inherited PGDATABASE or PGPASSWORD would point psql at the wrong database: drop them.
+if [ "${LODAM_STAGE:-}" != snapshot ]; then
+  unset PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGPASSWORD PGPASSFILE PGSERVICE PGSERVICEFILE \
+        PGSSLMODE PGOPTIONS PGAPPNAME PGTARGETSESSIONATTRS
+fi
+
 # Run a PostgreSQL server command as the postgres user when we are root
 run() { if [ "$(id -u)" = 0 ]; then su postgres -s /bin/sh -c "$*"; else sh -c "$*"; fi; }
 
