@@ -8,6 +8,7 @@
 # Writes out/snapshots/<UTC time>.sql and .json (sha256, time, server version) and points
 # out/snapshots/latest.sql at it. A snapshot identical to the latest one is not kept again.
 # The snapshots are the database as a whole: private, they stay on the server (never in a repo).
+# shellcheck disable=SC2034  # read by common.sh
 LODAM_STAGE=snapshot                 # keep the PG* variables (common.sh drops them elsewhere)
 source "$(dirname "$0")/common.sh"
 : "${PGHOST:?set PGHOST etc. (see .env.example)}" "${PGDATABASE:?set PGDATABASE}" "${PGUSER:?set PGUSER}"

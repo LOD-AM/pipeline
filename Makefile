@@ -16,7 +16,7 @@ PY ?= python3
 ONTOP_LIB ?= $(CURDIR)/.cache/ontop/$(shell sha256sum mapping/pom.xml | cut -c1-16)
 export KG ONTOP_LIB
 
-.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot materialize enrich check publish package test-pipeline clean
+.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot changed materialize enrich check publish package test-pipeline test-deploy clean
 
 release: materialize enrich check publish package
 
@@ -35,6 +35,9 @@ fetch-kg:            ## ontologies the knowledge-graph checks need → $(KG)/.ca
 snapshot:            ## live research database (read-only) → out/snapshots/<time>.sql, latest.sql
 	bash scripts/stages/snapshot.sh
 
+changed:             ## inputs changed since the live release? → out/run-decision.txt (deploy/run.sh)
+	$(PY) scripts/stages/changed.py
+
 materialize:         ## dump → Postgres → views → R2RML → Ontop (out/.build/ontop.ttl, skip report)
 	bash scripts/stages/materialize.sh $(DUMP)
 
@@ -52,6 +55,9 @@ package:             ## → out/release/ + out/internal/ (previous: *.prev/)
 
 test-pipeline:       ## package/publish rules: a failed check never replaces a release (no database)
 	bash scripts/stages/test_pipeline.sh
+
+test-deploy:         ## deploy/run.sh control flow with stubbed docker and curl (no server needed)
+	bash deploy/test_deploy.sh
 
 clean:               ## remove the scratch directory (never a release or a snapshot)
 	rm -rf out/.build
