@@ -100,7 +100,26 @@ make test-pipeline                           # package rules, no database needed
 ```
 or with the image: `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -v /path/to/dump.sql:/dump.sql:ro lod-am-pipeline release DUMP=/dump.sql`.
 
+## Schema rounds of the research database (planning#27)
+The database is restructured in rounds (renames, constraints, explicit semantics, …). Each round is
+a fix script in LOD-AM/ingest plus the matching change of `mapping/` here, and it must give **the same
+graph**, except for the changes the round intends (listed per round in planning#27). How a round
+shows that, with the dump before and after the round:
+```bash
+make release DUMP=../ingest/lod-am.sql KG=../knowledge-graph     # before the round (ingest main)
+make baseline                                 # out/baseline/: full graph + manifest of "before"
+# apply the round's fix script to the dump, change mapping/ to the new names
+make release DUMP=<dump after the round> KG=../knowledge-graph
+make compare                                  # "the same graph" (exit 0), or what changed (exit 1)
+```
+`make compare` (`scripts/compare_graphs.py`) groups removed and added triples by record kind and
+predicate, with examples. Use the same Zotero snapshot (`.cache/zotero`) and `KG_COMMIT` for both
+builds, so that only the round can make a difference. Baseline and report are private like all of
+`out/`: never commit them. A PR gives the canonical sha256 of both graphs and the intended changes,
+with single example triples at most.
+
 ## Files
+- `scripts/compare_graphs.py`: two full graphs, same or what changed (schema rounds, planning#27)
 - `Makefile`, `scripts/stages/`: the stages (`measure.py` records memory and time, `changed.py` decides whether
   a scheduled run needs a release); `scripts/`: Zotero, literature, source-row test, publication export
 - `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`)
