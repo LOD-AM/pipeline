@@ -9,6 +9,8 @@
 #   6. no webhook configured: release, no signal, exit 0
 #   7. only the PG* lines of .env reach the container (never the webhook token); the release
 #      container has no network; a new commit on origin/main is fast-forwarded
+#   8. LODAM_PUBLISH_DIR gets each new release, world-readable, before the signal
+#   9. an unchanged run refreshes an outdated publish dir (and signals), leaves a current one alone
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SRC=$PWD
@@ -99,3 +101,18 @@ reset; DECISION="unchanged: x" run || fail "7: run failed"
 [ "$(git -C "$W" rev-parse HEAD)" = "$(git -C "$T/other" rev-parse HEAD)" ] && [ "$(calls 'docker build' docker.log)" = 1 ] \
   || fail "7: new commit on origin/main not fast-forwarded, or image not rebuilt for a changed Dockerfile"
 echo "ok   7 only PG* reach the container; origin/main fast-forwarded; image rebuilt when its inputs change"
+
+# 8. LODAM_PUBLISH_DIR: a new release is copied there (world-readable) and then signalled
+echo "LODAM_PUBLISH_DIR=$T/pub" >> "$W/.env"; echo 'LODAM_RELEASE_WEBHOOK=http://triplestore.example.invalid:9300/lodam-release' >> "$W/.env"
+reset; DECISION="changed: x" run || fail "8: run failed"
+cmp -s "$W/out/release/manifest.json" "$T/pub/manifest.json" && [ "$(stat -c %a "$T/pub/manifest.json")" = 644 ] \
+  && [ "$(stat -c %a "$T/pub")" = 755 ] && [ "$(calls 'manifest_sha256' curl.log)" = 1 ] || fail "8: release not copied world-readable, or not signalled"
+echo "ok   8 new release copied to LODAM_PUBLISH_DIR (755/644), then signalled"
+
+# 9. unchanged: an outdated publish dir gets the live release (and a signal), a current one nothing
+echo '{"old": true}' > "$T/pub/manifest.json"; reset; DECISION="unchanged: x" run || fail "9: run failed"
+cmp -s "$W/out/release/manifest.json" "$T/pub/manifest.json" && [ "$(calls 'manifest_sha256' curl.log)" = 1 ] \
+  && [ "$(calls ' release$' docker.log)" = 0 ] || fail "9: outdated publish dir not refreshed"
+reset; DECISION="unchanged: x" run || fail "9: run failed"
+[ "$(calls curl curl.log)" = 0 ] || fail "9: signalled although the publish dir was current"
+echo "ok   9 unchanged: outdated publish dir refreshed and signalled; current one left alone"

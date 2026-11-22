@@ -20,6 +20,9 @@ fi
 for cmd in docker git curl flock setpriv getent; do
   command -v "$cmd" > /dev/null || { echo "FAIL: $cmd not installed" >&2; exit 1; }
 done
+if grep -q '^LODAM_PUBLISH_DIR=.' .env && ! command -v rsync > /dev/null; then
+  echo "FAIL: LODAM_PUBLISH_DIR is set, but rsync is not installed (apt install rsync)" >&2; exit 1
+fi
 sed "s|@DIR@|$DIR|g" deploy/lodam-pipeline.service > "$UNITS/lodam-pipeline.service"
 cp deploy/lodam-pipeline.timer "$UNITS/lodam-pipeline.timer"
 systemctl daemon-reload

@@ -12,8 +12,11 @@
    Zotero version.
 4. **`release`**, only if something changed: with `RELEASE_STRICT=1` and `--network none`, so the
    conversion provably runs offline.
-5. **Signal:** a `POST` to `LODAM_RELEASE_WEBHOOK` (optional), so that the triplestore fetches
-   `out/release/` (planning#7). It carries only `{"manifest_sha256": …}`, never data.
+5. **Hand over:** copy `out/release/` to `LODAM_PUBLISH_DIR` (optional; world-readable, released data
+   only, because `out/` itself is owner-only), then a `POST` to `LODAM_RELEASE_WEBHOOK` (optional), so
+   that the triplestore fetches the release from there (planning#7). The signal carries only
+   `{"manifest_sha256": …}`, never data. An unchanged run still hands over the live release if
+   `LODAM_PUBLISH_DIR` is behind (e.g. just configured).
 
 A failing step ends the run with an error (`systemctl --failed` shows it). `out/release/` is only
 ever replaced by a fully checked release. If nothing changed, the run ends after the snapshot
@@ -46,6 +49,8 @@ after a change in `deploy/`. Undo: `sudo deploy/install.sh --remove`.
 `out/internal/manifest.json` (`resources`), and the run's log shows the peak. When `peak_rss_mb`
 approaches the LXC's RAM, give it more (README "Memory").
 
-**Webhook (planning#7):** add `LODAM_RELEASE_WEBHOOK=` and `LODAM_RELEASE_WEBHOOK_TOKEN=` to
-`.env` once the triplestore's receiver exists. Without them, releases are still built, just not
-signalled.
+**Hand-over to the triplestore (planning#7):** set `LODAM_PUBLISH_DIR=/srv/lodam/release`,
+`LODAM_RELEASE_WEBHOOK=http://<triplestore LXC>:9300/lodam-release` and
+`LODAM_RELEASE_WEBHOOK_TOKEN=` (printed by the triplestore's `deploy/install.sh`) in `.env`; the
+whole setup, including the read-only `lodam-release` account, is in the triplestore README
+("Releases"). Without them, releases are still built, just not handed over.

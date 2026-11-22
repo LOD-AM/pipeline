@@ -51,8 +51,10 @@ the graph: say which triples change and why in the PR.
 - Data LXC (owner, 2026-11-22): read-only role, Docker, first complete run by hand: full graph
   `canonical_sha256` `b82fc318…`, 331,903 triples, identical to the ingest dump's graph. The first attempt was
   killed for lack of memory (exit 137 in the term check at 1 GB); the LXC now has 3 GB RAM + 1 GB swap. Scheduled run: `deploy/` (planning#6), installed by the owner with `deploy/install.sh`.
-- Next: planning#7 (triplestore pulls `out/release/` with rsync over SSH, owner 2026-11-21; webhook from
-  `deploy/run.sh`, contract: POST `{"manifest_sha256"}` with a bearer token), the release flag in the database
+- planning#7: `deploy/run.sh` copies each release to `LODAM_PUBLISH_DIR` (/srv/lodam/release, world-readable) and
+  signals the triplestore's webhook (POST /lodam-release, bearer token, `{"manifest_sha256"}`); the triplestore pulls
+  with rsync over SSH (`rrsync -ro`, LOD-AM/triplestore `scripts/update_published.sh`).
+- Next: the release flag in the database
   (planning#27 round 3), a public fixture (from the released `hauptmann2002chemical`) so CI can run
   a whole release without private data.
 
