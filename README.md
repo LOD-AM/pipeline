@@ -38,8 +38,9 @@ packaged. A full run on ~330,000 triples takes about 40 minutes on the data LXC 
 on one core) and about 12 minutes on a faster machine.
 
 **Which publications are released** is decided in the database: `cau.literature.released_on`
-(a date; planning#27). Until that column exists, `config/released-publications.txt` stands in for
-it (currently `hauptmann2002chemical`, already on lod-am.net).
+(a date; planning#27 round 3): set and not in the future = released, a future date schedules the
+release (currently `hauptmann2002chemical`, released on 2026-11-17). The history is in ingest
+`docs/decisions.md`.
 
 **manifest.json** (`out/release/`) traces every file to its inputs: the snapshot (sha256, time),
 the pipeline commit and image, the knowledge-graph commit, the Zotero library version, and per
@@ -124,7 +125,6 @@ with single example triples at most.
   a scheduled run needs a release); `scripts/`: Zotero, literature, source-row test, publication export
 - `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`)
 - `mapping/`: SQL views + R2RML ([`mapping/README.md`](mapping/README.md)), `pom.xml` (Ontop)
-- `config/released-publications.txt`: stand-in for the database's release flag
 - `Dockerfile`, `docker/`: the build image ([`docker/README.md`](docker/README.md))
 - `.github/workflows/ci.yml`: tests and image build, **without data** (the database never reaches GitHub)
 

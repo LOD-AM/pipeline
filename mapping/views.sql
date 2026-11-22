@@ -28,11 +28,8 @@ SELECT iri('site', s.id_uuid)                          AS site_iri,
        -- name as reported (knowledge-graph CONVENTIONS "Sites"): an E41_Appellation
        CASE WHEN clean(s.site_as_reported) IS NOT NULL THEN iri('site', s.id_uuid) || '/name_as_reported' END AS name_iri,
        clean(s.site_as_reported)                       AS as_reported,
-       -- location certainty: a type on the place (uncertain / vicinity / area)
-       CASE s.site_location_certainty
-            WHEN 'uncertain' THEN 'https://lod-am.net/id/location_uncertain'
-            WHEN 'vicinity'  THEN 'https://lod-am.net/id/location_vicinity'
-            WHEN 'area'      THEN 'https://lod-am.net/id/location_area' END AS certainty_iri
+       -- location certainty: a type on the place; codes from cau.location_certainty (= the vocabulary terms)
+       CASE WHEN s.site_location_certainty IS NOT NULL THEN 'https://lod-am.net/id/location_' || s.site_location_certainty END AS certainty_iri
 FROM cau.site s
 LEFT JOIN cau.context_type si USING (context_type_id)
 LEFT JOIN cau.region r USING (region_id)
@@ -70,10 +67,10 @@ FROM cau.context_type i;
 CREATE VIEW feature AS
 SELECT iri('feature', f.id_uuid) AS feature_iri,
        iri('site', s.id_uuid)    AS site_iri,
-       CASE WHEN f.context_type_id = 5
+       CASE WHEN i.code = 'unspecified_context'
             THEN s.site_latin || ', unspecified context' || coalesce(', ' || clean(z.period_en), '')
             ELSE clean(f.feature_en) END AS label_en,
-       CASE WHEN f.context_type_id = 5
+       CASE WHEN i.code = 'unspecified_context'
             THEN s.site_latin || ', unbestimmter Kontext' || coalesce(', ' || clean(z.period_de), '')
             ELSE clean(f.feature_de) END AS label_de,
        iri('type', i.id_uuid)    AS type_iri,
@@ -167,9 +164,8 @@ SELECT iri('find', x.id_uuid) AS find_iri,
        n.old,
        CASE WHEN n.drawing IS NOT NULL THEN iri('find', x.id_uuid) || '/drawing_number' END AS drawing_iri,
        n.drawing,
-       -- material: base metal of the object (chemical_analysis.material_id, ingest#13); 1 = cu -> AAT <copper and copper alloy>
-       CASE WHEN EXISTS (SELECT 1 FROM cau.chemical_analysis c WHERE c.site_id = x.site_id AND c.find_id = x.find_id AND c.material_id = 1)
-            THEN 'http://vocab.getty.edu/aat/300241441' END AS material_iri,
+       -- material: base metal of the object (find.material_id, its AAT id in cau.material; ingest#13, planning#27)
+       CASE WHEN m.aat_id IS NOT NULL THEN 'http://vocab.getty.edu/aat/' || m.aat_id END AS material_iri,
        pub.publication_iri
 FROM cau.find x
 LEFT JOIN cau.literature lit ON lit.literature_id = x.literature_id
@@ -177,6 +173,7 @@ LEFT JOIN lodam_lit.publication pub ON pub.zotero_key = lit.zotero_key
 JOIN cau.site s USING (site_id)
 JOIN cau.type t USING (type_id)
 LEFT JOIN cau.feature f ON f.site_id = x.site_id AND f.feature_id = x.feature_id
+LEFT JOIN cau.material m ON m.material_id = x.material_id
 CROSS JOIN LATERAL (SELECT clean(x.find_no_reported) AS old,
        CASE WHEN clean(x.drawing_no_reported) IS NOT NULL AND clean(x.drawing_no_reported) <> coalesce(clean(x.find_no_reported), '') AND clean(x.drawing_no_reported) <> x.find_id::text
             THEN clean(x.drawing_no_reported) END AS drawing) n
@@ -190,10 +187,10 @@ SELECT iri('lab', l.id_uuid) AS lab_iri, clean(l.lab_en) AS label_en,
        CASE WHEN clean(l.ror_id) IS NOT NULL THEN 'https://ror.org/' || clean(l.ror_id) END AS ror_iri
 FROM cau.lab l;
 
--- Object parts (part_id 1 blade, 2 handle, 3 rivet; 0 = the whole object, ingest#5) ------------------
+-- Object parts (blade, handle, rivet; code whole_object = no sub-part, ingest#5) ------------------
 CREATE VIEW part_type AS
 SELECT iri('type', p.id_uuid) AS type_iri, clean(p.part_en) AS label_en, clean(p.part_de) AS label_de
-FROM cau.part p WHERE p.part_id <> 0;
+FROM cau.part p WHERE p.code IS DISTINCT FROM 'whole_object';
 
 CREATE VIEW find_part AS
 SELECT DISTINCT fv.find_iri, fv.find_iri || '/' || lower(replace(p.part_en, ' ', '_')) AS part_iri,
@@ -203,30 +200,34 @@ FROM (SELECT site_id, find_id, part_id FROM cau.chemical_analysis UNION SELECT s
 JOIN cau.part p USING (part_id)
 JOIN cau.find x ON x.site_id = a.site_id AND x.find_id = a.find_id
 JOIN lodam_rdf.find fv ON fv.find_iri = iri('find', x.id_uuid)
-WHERE a.part_id <> 0;
+WHERE p.code IS DISTINCT FROM 'whole_object';
 
 -- Analyses: one sampling, one sample and one analysis per chemical_analysis / lead_isotope_analysis row (repeat analyses are separate
--- samples, ingest#5). Method mostly unknown for ca (interim: AFO assay); pb: mass spectrometry (ingest#5).
--- Identifier: analysis_no_reported (original lab number) or the id (ingest#13). remarks dropped (ingest#13).
+-- samples, ingest#5). Method from cau.analysis_method (AFO class; chemical: assay, method mostly unknown;
+-- lead isotopes: mass spectrometry, ingest#5). Identifier: analysis_no_reported (original lab number) or
+-- the id (ingest#13). Remarks are a public note on the analysis (owner, 2026-11-22; planning#27).
 CREATE VIEW analysis AS
 SELECT iri('analysis', a.id_uuid) AS analysis_iri,
        iri('analysis', a.id_uuid) || '/sampling' AS sampling_iri,
        iri('analysis', a.id_uuid) || '/sample' AS sample_iri,
-       CASE WHEN a.part_id = 0 THEN fv.find_iri ELSE fv.find_iri || '/' || lower(replace(p.part_en, ' ', '_')) END AS sampled_iri,
+       CASE WHEN p.code = 'whole_object' THEN fv.find_iri ELSE fv.find_iri || '/' || lower(replace(p.part_en, ' ', '_')) END AS sampled_iri,
        a.kind,
-       CASE a.kind WHEN 'ca' THEN 'http://purl.allotrope.org/ontologies/process#AFP_0002680'      -- assay
-                   ELSE 'http://purl.allotrope.org/ontologies/process#AFP_0001427' END AS method_iri, -- mass spectrometry
+       'http://purl.allotrope.org/ontologies/process#' || am.afo_id AS method_iri,
        coalesce(clean(a.ref), a.id::text) AS identifier,
        CASE a.kind WHEN 'ca' THEN 'Chemical analysis ' ELSE 'Lead isotope analysis ' END || coalesce(clean(a.ref), a.id::text) || ' of ' || fv.label_en AS label_en,
        CASE a.kind WHEN 'ca' THEN 'Chemische Analyse ' ELSE 'Bleiisotopenanalyse ' END || coalesce(clean(a.ref), a.id::text) || ' von ' || fv.label_de AS label_de,
-       'Sample from ' || fv.label_en || CASE WHEN a.part_id = 0 THEN '' ELSE ', ' || p.part_en END
+       'Sample from ' || fv.label_en || CASE WHEN p.code = 'whole_object' THEN '' ELSE ', ' || p.part_en END
            || ' (' || coalesce(clean(a.ref), a.id::text) || ')' AS sample_label_en,
-       'Probe von ' || fv.label_de || CASE WHEN a.part_id = 0 THEN '' ELSE ', ' || p.part_de END
+       'Probe von ' || fv.label_de || CASE WHEN p.code = 'whole_object' THEN '' ELSE ', ' || p.part_de END
            || ' (' || coalesce(clean(a.ref), a.id::text) || ')' AS sample_label_de,
        CASE WHEN l.id_uuid IS NOT NULL THEN iri('lab', l.id_uuid) END AS lab_iri,
+       clean(a.remarks) AS note,
        pub.publication_iri
-FROM (SELECT 'ca' AS kind, chemical_analysis_id AS id, site_id, find_id, part_id, lab_id, analysis_no_reported AS ref, literature_id, id_uuid FROM cau.chemical_analysis
-      UNION ALL SELECT 'pb', lead_isotope_analysis_id, site_id, find_id, part_id, lab_id, analysis_no_reported, literature_id, id_uuid FROM cau.lead_isotope_analysis) a
+FROM (SELECT 'ca' AS kind, chemical_analysis_id AS id, site_id, find_id, part_id, lab_id, analysis_no_reported AS ref, literature_id, id_uuid,
+             analysis_method_id, remarks FROM cau.chemical_analysis
+      UNION ALL SELECT 'pb', lead_isotope_analysis_id, site_id, find_id, part_id, lab_id, analysis_no_reported, literature_id, id_uuid,
+             analysis_method_id, remarks FROM cau.lead_isotope_analysis) a
+JOIN cau.analysis_method am USING (analysis_method_id)
 LEFT JOIN cau.literature lit ON lit.literature_id = a.literature_id
 LEFT JOIN lodam_lit.publication pub ON pub.zotero_key = lit.zotero_key
 JOIN cau.part p USING (part_id)
@@ -234,47 +235,39 @@ JOIN cau.find x ON x.site_id = a.site_id AND x.find_id = a.find_id
 JOIN lodam_rdf.find fv ON fv.find_iri = iri('find', x.id_uuid)
 LEFT JOIN cau.lab l USING (lab_id);
 
--- Element measurements (ingest#4): values as reported (incl. 0); NULL = not detected, unless the element
--- is NULL in every analysis of the publication (= not analysed: nothing); all Cu of copper-base
--- objects (material_id 1) dropped. wt % = mass fraction. Elements: ChEBI ids from knowledge-graph tools/chebi.tsv.
+-- Element measurements (ingest#4): values as reported (incl. 0). An element the publication analysed
+-- (cau.analysed_element) with a NULL value = not detected; an element not analysed: nothing (owner,
+-- planning#27 round 3). All Cu of copper-base objects (find material code copper_base) dropped.
+-- wt % = mass fraction. ChEBI ids from cau.element (knowledge-graph tools/chebi.tsv).
 CREATE VIEW measurement AS
 SELECT iri('analysis', c.id_uuid) AS analysis_iri,
-       iri('analysis', c.id_uuid) || '/' || e.el AS measurement_iri,
-       e.chebi AS element_iri,
-       e.v::text AS value,
-       (e.v IS NULL) AS not_detected
+       iri('analysis', c.id_uuid) || '/' || e.element_code AS measurement_iri,
+       'http://purl.obolibrary.org/obo/' || e.chebi_id AS element_iri,
+       v.v::text AS value,
+       (v.v IS NULL) AS not_detected
 FROM cau.chemical_analysis c
-CROSS JOIN LATERAL (VALUES
-    ('cu', 'http://purl.obolibrary.org/obo/CHEBI_28694', c.cu), ('sn', 'http://purl.obolibrary.org/obo/CHEBI_27007', c.sn),
-    ('pb', 'http://purl.obolibrary.org/obo/CHEBI_25016', c.pb), ('zn', 'http://purl.obolibrary.org/obo/CHEBI_27363', c.zn),
-    ('bi', 'http://purl.obolibrary.org/obo/CHEBI_33301', c.bi), ('ag', 'http://purl.obolibrary.org/obo/CHEBI_30512', c.ag),
-    ('sb', 'http://purl.obolibrary.org/obo/CHEBI_30513', c.sb), ('as', 'http://purl.obolibrary.org/obo/CHEBI_27563', c."as"),
-    ('fe', 'http://purl.obolibrary.org/obo/CHEBI_18248', c.fe), ('ni', 'http://purl.obolibrary.org/obo/CHEBI_28112', c.ni),
-    ('co', 'http://purl.obolibrary.org/obo/CHEBI_27638', c.co), ('mn', 'http://purl.obolibrary.org/obo/CHEBI_18291', c.mn),
-    ('au', 'http://purl.obolibrary.org/obo/CHEBI_29287', c.au), ('p',  'http://purl.obolibrary.org/obo/CHEBI_28659', c.p),
-    ('te', 'http://purl.obolibrary.org/obo/CHEBI_30452', c.te), ('se', 'http://purl.obolibrary.org/obo/CHEBI_27568', c.se),
-    ('s',  'http://purl.obolibrary.org/obo/CHEBI_26833', c.s)) AS e(el, chebi, v)
-WHERE NOT (e.el = 'cu' AND c.material_id = 1)
-  AND NOT (e.v IS NULL AND NOT EXISTS (
-        SELECT 1 FROM cau.chemical_analysis c2 CROSS JOIN LATERAL (VALUES
-            ('cu', c2.cu), ('sn', c2.sn), ('pb', c2.pb), ('zn', c2.zn), ('bi', c2.bi), ('ag', c2.ag), ('sb', c2.sb),
-            ('as', c2."as"), ('fe', c2.fe), ('ni', c2.ni), ('co', c2.co), ('mn', c2.mn), ('au', c2.au), ('p', c2.p),
-            ('te', c2.te), ('se', c2.se), ('s', c2.s)) AS e2(el, v)
-        WHERE c2.literature_id = c.literature_id AND e2.el = e.el AND e2.v IS NOT NULL));
+JOIN cau.find x ON x.site_id = c.site_id AND x.find_id = c.find_id
+LEFT JOIN cau.material m ON m.material_id = x.material_id
+CROSS JOIN LATERAL (VALUES   -- the element columns (one per element, as entered)
+    ('cu', c.cu), ('sn', c.sn), ('pb', c.pb), ('zn', c.zn), ('bi', c.bi), ('ag', c.ag), ('sb', c.sb), ('as', c."as"),
+    ('fe', c.fe), ('ni', c.ni), ('co', c.co), ('mn', c.mn), ('au', c.au), ('p', c.p), ('te', c.te), ('se', c.se), ('s', c.s)) AS v(el, v)
+JOIN cau.element e ON e.element_code = v.el
+JOIN cau.analysed_element ae ON ae.literature_id = c.literature_id AND ae.element_code = v.el
+WHERE NOT (v.el = 'cu' AND m.code IS NOT DISTINCT FROM 'copper_base');
 
--- Lead isotope ratios (knowledge-graph#14): only ratios reported; nuclides as Wikidata items ------
+-- Lead isotope ratios (knowledge-graph#14): only ratios reported; nuclides (Wikidata) from cau.isotope_ratio ------
 CREATE VIEW isotope_ratio AS
 SELECT iri('analysis', b.id_uuid) AS analysis_iri,
-       iri('analysis', b.id_uuid) || '/' || r.name AS ratio_iri,
-       'http://www.wikidata.org/entity/' || r.num AS numerator_iri,
-       'http://www.wikidata.org/entity/' || r.den AS denominator_iri,
-       r.v::text AS value
+       iri('analysis', b.id_uuid) || '/' || r.ratio_code AS ratio_iri,
+       'http://www.wikidata.org/entity/' || r.numerator_wikidata AS numerator_iri,
+       'http://www.wikidata.org/entity/' || r.denominator_wikidata AS denominator_iri,
+       v.v::text AS value
 FROM cau.lead_isotope_analysis b
-CROSS JOIN LATERAL (VALUES
-    ('pb206_pb204', 'Q18883438', 'Q18883429', b.pb206_204), ('pb207_pb204', 'Q18883443', 'Q18883429', b.pb207_204),
-    ('pb208_pb204', 'Q16670466', 'Q18883429', b.pb208_204), ('pb207_pb206', 'Q18883443', 'Q18883438', b.pb207_206),
-    ('pb208_pb206', 'Q16670466', 'Q18883438', b.pb208_206), ('pb204_pb206', 'Q18883429', 'Q18883438', b.pb204_206)) AS r(name, num, den, v)
-WHERE r.v IS NOT NULL;
+CROSS JOIN LATERAL (VALUES   -- the ratio columns, as entered
+    ('pb206_204', b.pb206_204), ('pb207_204', b.pb207_204), ('pb208_204', b.pb208_204),
+    ('pb207_206', b.pb207_206), ('pb208_206', b.pb208_206), ('pb204_206', b.pb204_206)) AS v(col, v)
+JOIN cau.isotope_ratio r ON r.column_name = v.col
+WHERE v.v IS NOT NULL;
 
 -- Skip report: every source row that is not converted, with the reason ---------------
 CREATE VIEW skip AS

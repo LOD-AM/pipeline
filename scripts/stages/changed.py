@@ -3,9 +3,8 @@
 
 Compares the inputs a release would be built from with those in out/release/manifest.json:
 the database snapshot (sha256 of out/snapshots/latest.sql), the pipeline commit, the
-knowledge-graph commit and the Zotero library version. The release list (config/) and the
-release flag (planning#27) are covered: the first is part of the pipeline commit, the second of
-the snapshot.
+knowledge-graph commit and the Zotero library version. The release flag
+(cau.literature.released_on, planning#27) is part of the snapshot.
 
 Writes one line to out/run-decision.txt, read by deploy/run.sh:
   changed: <what changed>     a release run is needed
