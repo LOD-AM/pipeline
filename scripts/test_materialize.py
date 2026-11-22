@@ -65,8 +65,8 @@ for s in expected_sites:
     places = list(g.objects(s, CRM.P53_has_former_or_current_location))
     if len(labels) != 1 or len(places) != 1:
         errors.append(f"{s}: {len(labels)} @en labels, {len(places)} places")
-with_geom = iris("site", "SELECT s.id_uuid FROM cau.site s JOIN cau.geography g USING (geography_id) "
-                 "WHERE g.geography IS NOT NULL AND nullif(btrim(s.site_latin), '') IS NOT NULL")
+with_geom = iris("site", "SELECT s.id_uuid FROM cau.site s "
+                 "WHERE s.geometry IS NOT NULL AND nullif(btrim(s.site_latin), '') IS NOT NULL")
 same("site and region places with geometry",
      {URIRef(f"{s}/location") for s in with_geom} | iris("region", "SELECT id_uuid FROM cau.region WHERE geography IS NOT NULL"),
      {p for p in g.subjects(GEO.hasGeometry, None)})

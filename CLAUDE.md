@@ -57,10 +57,14 @@ the graph: say which triples change and why in the PR.
   1.27 GB (SHACL), a run takes ~40 min. Exports use knowledge-graph's canonical prefixes (#14), so the same
   triples give the same file. Still to confirm (planning#33): a run with nothing new ends with `unchanged`.
 - Alerts on failure (planning#34): `deploy/alert.sh` via `OnFailure=lodam-alert@%n` in `lodam-pipeline.service`
-  (curl SMTP, `LODAM_ALERT_*` in `.env`; identical copy in LOD-AM/triplestore). Not yet deployed: the owner sets
-  `LODAM_ALERT_*`, runs `sudo deploy/install.sh`, `sudo deploy/alert.sh --test` and the failing run in `deploy/README.md`.
-- Next: the release flag in the database (planning#27 round 3), a public
-  fixture (from the released `hauptmann2002chemical`) so CI can run a whole release without private data.
+  (curl SMTP, `LODAM_ALERT_*` in `.env`; identical copy in LOD-AM/triplestore). Live and tested by the owner (2026-11-22).
+- Database overhaul (planning#27): the views follow ingest's schema rounds; each round is checked with `make baseline` /
+  `make compare` (README "Schema rounds"). Done: renames (round 1), constraints (2), explicit semantics (3: the release
+  flag `cau.literature.released_on` is the only release switch; `analysed_element`, codes, reference tables; analysis
+  remarks as `P3_has_note`, full graph `4289f5d3…`), site point as `site.geometry` (5). A view change lands together
+  with the owner's run of the round's SQL (the nightly run pulls `main`).
+- Next: round 4 (reported ids only, after the owner's review), round 6 (helper views); a public fixture (from the
+  released `hauptmann2002chemical`) so CI can run a whole release without private data.
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
