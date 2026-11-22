@@ -1,0 +1,14 @@
+# When the scheduled pipeline run starts (planning#6). An unchanged database gives no new release,
+# so a nightly run costs a snapshot and a few seconds. Change OnCalendar to taste, then
+# `sudo systemctl daemon-reload`. Run by hand: sudo systemctl start lodam-pipeline
+[Unit]
+Description=Nightly LOD-AM pipeline run (planning#6)
+
+[Timer]
+OnCalendar=*-*-* 03:17
+RandomizedDelaySec=15min
+# Catch up after the LXC was off at that time
+Persistent=true
+
+[Install]
+WantedBy=timers.target

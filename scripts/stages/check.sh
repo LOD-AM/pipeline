@@ -7,16 +7,16 @@ source "$(dirname "$0")/common.sh"
 need "$BUILD/lod-am.ttl" enrich
 db_up
 rm -f "$BUILD/checks.json"
-python3 "$KG/tools/check_terms.py" "$BUILD/lod-am.ttl"
+measure check_terms python3 "$KG/tools/check_terms.py" "$BUILD/lod-am.ttl"
 # The local concepts (:name_as_reported, :location_area, :not_detected …) live in knowledge-graph
 # One run (pySHACL takes several minutes on the full graph); warnings are counted, violations fail
-if ! python3 "$KG/tools/validate.py" "$BUILD/lod-am.ttl" "$KG/data/vocab" > "$BUILD/shacl.txt"; then
+if ! measure shacl python3 "$KG/tools/validate.py" "$BUILD/lod-am.ttl" "$KG/data/vocab" > "$BUILD/shacl.txt"; then
   grep -v '^warning:' "$BUILD/shacl.txt" | head -40; echo "FAIL: SHACL violations (out/.build/shacl.txt)" >&2; exit 1
 fi
 tail -1 "$BUILD/shacl.txt"
 grep '^warning:' "$BUILD/shacl.txt" | sed -E -e 's/^warning: \S+ (\S*): /\1: /' -e 's/<[^>]*>/<…>/g' | sort | uniq -c | sort -rn > "$BUILD/shacl-warnings.txt" || true
 head -8 "$BUILD/shacl-warnings.txt"
-python3 scripts/test_materialize.py "$BUILD/lod-am.ttl" "$BUILD/skip-report.csv" "$DBURL" | tee "$BUILD/test_materialize.txt"
+measure test_materialize python3 scripts/test_materialize.py "$BUILD/lod-am.ttl" "$BUILD/skip-report.csv" "$DBURL" | tee "$BUILD/test_materialize.txt"
 python3 - "$BUILD" <<'PY'
 import json, sys
 from pathlib import Path

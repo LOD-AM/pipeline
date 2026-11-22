@@ -79,7 +79,17 @@ docker run --rm --network host --user "$(id -u):$(id -g)" --env-file .env -v "$P
 ```
 `RELEASE_STRICT=1` (`-e RELEASE_STRICT=1`) is for scheduled runs. `out/snapshots/` grows by one file
 per changed database; delete old snapshots by hand when they are no longer needed for tracing.
-Scheduling, and handing the release to the triplestore, follow in planning#6 and #7.
+
+**Scheduled runs** (nightly, only when something changed): [`deploy/README.md`](deploy/README.md).
+Handing the release to the triplestore: planning#7.
+
+## Memory
+The checks hold the whole graph in memory (rdflib). Measured with 331,903 triples: SHACL peaks at
+**~1.3 GB** (9 min), the term check, export and package at 0.6–0.8 GB, the throwaway Postgres ~0.2 GB.
+The data LXC needs **3 GB RAM + 1 GB swap** today (with the live Postgres); too little shows as
+`Killed` and exit code 137. Rule of thumb: ~4 GB of SHACL peak per million triples, growing with
+the database, not with the number of released publications. Every release records the peak per
+step in `out/internal/manifest.json` (`resources`), so the trend is visible run by run.
 
 ## Elsewhere (owner's machine, with a dump file)
 ```bash
@@ -90,7 +100,9 @@ make test-pipeline                           # package rules, no database needed
 or with the image: `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -v /path/to/dump.sql:/dump.sql:ro lod-am-pipeline release DUMP=/dump.sql`.
 
 ## Files
-- `Makefile`, `scripts/stages/`: the stages; `scripts/`: Zotero, literature, source-row test, publication export
+- `Makefile`, `scripts/stages/`: the stages (`measure.py` records memory and time, `changed.py` decides whether
+  a scheduled run needs a release); `scripts/`: Zotero, literature, source-row test, publication export
+- `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`)
 - `mapping/`: SQL views + R2RML ([`mapping/README.md`](mapping/README.md)), `pom.xml` (Ontop)
 - `config/released-publications.txt`: stand-in for the database's release flag
 - `Dockerfile`, `docker/`: the build image ([`docker/README.md`](docker/README.md))

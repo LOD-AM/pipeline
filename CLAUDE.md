@@ -20,7 +20,9 @@ as a fresh start without ingest's history (that history contains the database du
 ## Checks
 ```bash
 make test-pipeline                                   # package/publish rules, no database
-bash -n scripts/stages/*.sh docker/entrypoint.sh
+make test-deploy                                     # deploy/run.sh control flow (stubbed docker/curl)
+bash -n scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+shellcheck -S warning scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
 bash scripts/check_shared_block.sh                   # shared block vs knowledge-graph
 ```
 A full run needs a dump: `make fetch`, then `make release DUMP=<dump.sql> KG=../knowledge-graph`
@@ -42,12 +44,15 @@ the graph: say which triples change and why in the PR.
   by `KG_COMMIT`). Dependabot proposes bumps; bump `KG_COMMIT` by hand, in its own PR.
 - Licence: MIT (`LICENSE`, owner 2026-11-21), the same text as knowledge-graph's code licence.
 
-## Where to resume (state 2026-11-21)
+## Where to resume (state 2026-11-22)
 - Moved from ingest (LOD-AM/ingest#47: stages, manifest, build image; verified there: image in CI
   gave the same graph as local runs, canonical sha256 `b82fc318…`, 331,903 triples). New here:
   `snapshot` and `publish` stages, release = released publications only, `out/internal/`.
-- Next: planning#6 (scheduled run on the data LXC, owner sets up the read-only role and Docker,
-  planning#26), planning#7 (triplestore pulls the release), the release flag in the database
+- Data LXC (owner, 2026-11-22): read-only role, Docker, first complete run by hand: full graph
+  `canonical_sha256` `b82fc318…`, 331,903 triples, identical to the ingest dump's graph. The first attempt was
+  killed for lack of memory (exit 137 in the term check at 1 GB); the LXC now has 3 GB RAM + 1 GB swap. Scheduled run: `deploy/` (planning#6), installed by the owner with `deploy/install.sh`.
+- Next: planning#7 (triplestore pulls `out/release/` with rsync over SSH, owner 2026-11-21; webhook from
+  `deploy/run.sh`, contract: POST `{"manifest_sha256"}` with a bearer token), the release flag in the database
   (planning#27 round 3), a public fixture (from the released `hauptmann2002chemical`) so CI can run
   a whole release without private data.
 
