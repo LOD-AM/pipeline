@@ -1,5 +1,6 @@
-# Proposes version bumps of the converter image's inputs as PRs (planning#4). Each bump must
-# pass the image workflow (same graph, same check results) before it is merged.
+# Proposes version bumps of the pipeline image's inputs as PRs (planning#4). Before merging, a bump
+# must pass CI and, on the data LXC, give the same full graph (canonical_sha256 in
+# out/internal/manifest.json) unless the PR says why it changes.
 version: 2
 updates:
   - package-ecosystem: docker          # base images in Dockerfile (pinned by digest)
@@ -7,6 +8,17 @@ updates:
     schedule:
       interval: weekly
     labels: ["dependency-updates"]
+    ignore:
+      # PostgreSQL stays on major 16, the research database's version (planning#26); PostGIS
+      # minors within 16-* are fine
+      - dependency-name: "postgis/postgis"
+        versions: [">= 17"]
+      # Java stays 17: Ontop 5.5 and its jar set were verified with it
+      - dependency-name: "eclipse-temurin"
+        versions: [">= 18"]
+      # the Maven image only fetches jars at build time, and Dependabot swaps its JDK suffix
+      # (…-temurin-17 → …-temurin-26): bump it by hand
+      - dependency-name: "maven"
   - package-ecosystem: pip             # docker/requirements.txt (rdflib, pyshacl + dependencies, hashes)
     directory: "/docker"
     schedule:
