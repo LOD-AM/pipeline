@@ -57,7 +57,10 @@ the graph: say which triples change and why in the PR.
   `scripts/update_published.sh`), loads it and hands it to the website as a "Data release" PR. Peak memory
   1.27 GB (SHACL), a run takes ~40 min. Exports use knowledge-graph's canonical prefixes (#14), so the same
   triples give the same file. Still to confirm (planning#33): a run with nothing new ends with `unchanged`.
-- Next: the release flag in the database (planning#27 round 3), alerts on failure (planning#34), a public
+- Alerts on failure (planning#34): `deploy/alert.sh` via `OnFailure=lodam-alert@%n` in `lodam-pipeline.service`
+  (curl SMTP, `LODAM_ALERT_*` in `.env`; identical copy in LOD-AM/triplestore). Not yet deployed: the owner sets
+  `LODAM_ALERT_*`, runs `sudo deploy/install.sh`, `sudo deploy/alert.sh --test` and the failing run in `deploy/README.md`.
+- Next: the release flag in the database (planning#27 round 3), a public
   fixture (from the released `hauptmann2002chemical`) so CI can run a whole release without private data.
 
 ## LOD-AM project (shared block: keep identical in every repo)
