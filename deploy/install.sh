@@ -17,7 +17,7 @@ if [ "${1:-}" = --remove ]; then
 fi
 [[ $DIR != *[[:space:]]* ]] || { echo "FAIL: the checkout path must not contain spaces: $DIR" >&2; exit 1; }
 [ -f .env ] || { echo "FAIL: .env missing (cp .env.example .env, chmod 600 .env, fill in)" >&2; exit 1; }
-for cmd in docker git curl flock runuser; do
+for cmd in docker git curl flock setpriv getent; do
   command -v "$cmd" > /dev/null || { echo "FAIL: $cmd not installed" >&2; exit 1; }
 done
 sed "s|@DIR@|$DIR|g" deploy/lodam-pipeline.service > "$UNITS/lodam-pipeline.service"
@@ -25,4 +25,4 @@ cp deploy/lodam-pipeline.timer "$UNITS/lodam-pipeline.timer"
 systemctl daemon-reload
 systemctl enable --now lodam-pipeline.timer
 systemctl list-timers lodam-pipeline.timer --no-pager
-echo "installed. Run now: sudo systemctl start lodam-pipeline; log: journalctl -u lodam-pipeline -e"
+echo "installed. Run now: sudo systemctl start --no-block lodam-pipeline; log: sudo journalctl -u lodam-pipeline -f"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control-flow tests of deploy/run.sh (planning#6), with docker, curl and runuser stubbed; no server,
+# Control-flow tests of deploy/run.sh (planning#6), with docker, curl and setpriv stubbed; no server,
 # database or Docker daemon needed. The checkout is a temporary clone with its own "origin".
 #   1. first run: image built, snapshot + decision, offline release, webhook signalled
 #   2. nothing changed: no rebuild, no release, no signal
@@ -47,9 +47,10 @@ cat > "$T/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >> "$T/curl.log"
 EOF
-cat > "$T/bin/runuser" <<'EOF'
+cat > "$T/bin/setpriv" <<'EOF'
 #!/usr/bin/env bash
-shift 2; [ "$1" = -- ] && shift; exec "$@"
+# stub: drop setpriv's options and run the command as is (the test does not run as root anyway)
+while [[ ${1:-} == --* ]]; do shift; done; exec "$@"
 EOF
 chmod +x "$T/bin/"*
 export T PATH="$T/bin:$PATH" LODAM_LOCK="$T/lock"

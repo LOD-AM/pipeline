@@ -34,7 +34,8 @@ the owner's data decisions and correction rounds in the private LOD-AM/ingest.
 
 `make release` = materialize → enrich → check → publish → package; it runs offline. A failed stage
 or check leaves `out/release/` and `out/internal/` as they were, and an empty result is never
-packaged. A full run takes about 12 minutes, almost all of it SHACL on ~330,000 triples.
+packaged. A full run on ~330,000 triples takes about 40 minutes on the data LXC (2 cores; SHACL alone ~32 min,
+on one core) and about 12 minutes on a faster machine.
 
 **Which publications are released** is decided in the database: `cau.literature.released_on`
 (a date; planning#27). Until that column exists, `config/released-publications.txt` stands in for

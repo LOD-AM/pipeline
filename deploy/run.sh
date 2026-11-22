@@ -21,7 +21,13 @@ FORCE=${1:-}
 log() { echo "pipeline-run: $*"; }
 OWNER=$(stat -c %U "$DIR")
 IDS="$(stat -c %u "$DIR"):$(stat -c %g "$DIR")"
-as_owner() { if [ "$(id -u)" = 0 ] && [ "$OWNER" != root ]; then runuser -u "$OWNER" -- "$@"; else "$@"; fi; }
+OWNER_HOME=$(getent passwd "$OWNER" | cut -d: -f6)
+# setpriv, not runuser: same user, groups and HOME, but no PAM session (two journal lines per call)
+as_owner() {
+  if [ "$(id -u)" = 0 ] && [ "$OWNER" != root ]; then
+    setpriv --reuid="$OWNER" --regid="$(stat -c %g "$DIR")" --init-groups env HOME="$OWNER_HOME" "$@"
+  else "$@"; fi
+}
 # Values from .env without executing it (it holds the database password)
 envval() { grep -E "^$1=" .env 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
@@ -60,8 +66,7 @@ log "$decision"
 # 4. release, offline
 docker run --rm --network none --user "$IDS" -e RELEASE_STRICT=1 -v "$DIR:/work" "$IMAGE" release
 sha=$(sha256sum out/release/manifest.json | cut -d' ' -f1)
-log "new release: out/release/ (manifest sha256 $sha)"
-grep -E '"(peak_rss_mb|peak_step|seconds)"' out/internal/manifest.json | head -3 | tr -s ' ' | sed 's/^/pipeline-run: resources/' || true
+log "new release: out/release/ (manifest sha256 $sha); peak memory and time per step: out/internal/manifest.json"
 
 # 5. signal
 url=$(envval LODAM_RELEASE_WEBHOOK)
