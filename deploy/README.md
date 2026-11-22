@@ -18,7 +18,7 @@
    `{"manifest_sha256": …}`, never data. An unchanged run still hands over the live release if
    `LODAM_PUBLISH_DIR` is behind (e.g. just configured).
 
-A failing step ends the run with an error (`systemctl --failed` shows it). `out/release/` is only
+A failing step ends the run with an error (`systemctl --failed` shows it) and mails the owner ([Alerts](#alerts-planning34)). `out/release/` is only
 ever replaced by a fully checked release. If nothing changed, the run ends after the snapshot
 (about a minute).
 
@@ -41,7 +41,7 @@ after a change in `deploy/`. Undo: `sudo deploy/install.sh --remove`.
 | Run now | `sudo systemctl start --no-block lodam-pipeline` (`start` without `--no-block` waits until the run is done) |
 | Release although nothing changed | `sudo deploy/run.sh --force` |
 | Log of the last run | `sudo journalctl -u lodam-pipeline -e` (lines start with `pipeline-run:`, peak memory per step with `resources:`) |
-| Did the last run fail? | `systemctl status lodam-pipeline` |
+| Did the last run fail? | `systemctl status lodam-pipeline` (a failed run is also mailed: [Alerts](#alerts-planning34)) |
 | Stop a run | `sudo systemctl stop lodam-pipeline` (`restart` also stops the running one; the live release stays) |
 | Time | `OnCalendar` in `lodam-pipeline.timer` (default 03:17 ± 15 min); then `sudo deploy/install.sh` again |
 
@@ -54,3 +54,22 @@ approaches the LXC's RAM, give it more (README "Memory").
 `LODAM_RELEASE_WEBHOOK_TOKEN=` (printed by the triplestore's `deploy/install.sh`) in `.env`; the
 whole setup, including the read-only `lodam-release` account, is in the triplestore README
 ("Releases"). Without them, releases are still built, just not handed over.
+
+## Alerts (planning#34)
+`lodam-pipeline.service` has `OnFailure=lodam-alert@%n.service`: a failed run (a failed check, the
+snapshot, the build, or a webhook that did not answer) starts `deploy/alert.sh`, which mails the
+unit's status and its last 60 journal lines. The live release is unchanged in every case. Normal
+runs and `unchanged … no new release` send nothing. The same script runs on the triplestore LXC
+(LOD-AM/triplestore README "Alerts").
+
+It sends with `curl` over SMTP (TLS required; port 465 = implicit TLS, otherwise STARTTLS), so the
+data LXC needs no mail server. Setup (owner, once): in `.env`, the `LODAM_ALERT_*` lines of
+`.env.example`; the SMTP account Watchtower uses on the triplestore LXC works. Then:
+```bash
+git pull && sudo deploy/install.sh            # installs lodam-alert@.service and the OnFailure= line
+sudo deploy/alert.sh --test                   # a test mail: checks the SMTP settings
+# a deliberately failing run, through the same OnFailure= path (mail "lodam-alert-check.service failed"):
+sudo systemd-run --unit=lodam-alert-check -p OnFailure=lodam-alert@lodam-alert-check.service /bin/false
+sudo journalctl -u 'lodam-alert@*' -e          # what the alert unit did
+```
+The mail contains only log lines of the run, which hold no data (decision, commits, peak memory).

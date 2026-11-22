@@ -58,6 +58,7 @@ test-pipeline:       ## package/publish rules: a failed check never replaces a r
 
 test-deploy:         ## deploy/run.sh control flow with stubbed docker and curl (no server needed)
 	bash deploy/test_deploy.sh
+	bash deploy/test_alert.sh
 
 clean:               ## remove the scratch directory (never a release or a snapshot)
 	rm -rf out/.build
