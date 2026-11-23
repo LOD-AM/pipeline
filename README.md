@@ -119,6 +119,29 @@ builds, so that only the round can make a difference. Baseline and report are pr
 `out/`: never commit them. A PR gives the canonical sha256 of both graphs and the intended changes,
 with single example triples at most.
 
+## Public CI fixture (`tests/fixture/`)
+Public CI has no data, so it runs a whole release on a **fixture**: the rows of one released
+publication (`hauptmann2002chemical`) and the rows they point to, with that publication's Zotero items
+and the file the server released (`expected.ttl`). `make test-fixture` (in CI inside the image, with
+`--network none`) builds a release from it in a scratch copy and checks that
+1. the release holds only that publication and the manifest,
+2. the released file is the same graph as `expected.ttl`,
+3. the full graph from the fixture has no triple that is not in the released file, so the fixture
+   holds nothing that isn't public already.
+
+A converter change that alters the released file fails 2: update `expected.ttl` in the same PR and
+say which triples change and why. **After a schema round** (planning#27) the fixture's dump no longer
+loads into the new views: rebuild it from the dump after the round, and check 3 again before committing:
+```bash
+make fetch-zotero
+scripts/make_fixture.py ../ingest/lod-am.sql hauptmann2002chemical tests/fixture/hauptmann2002chemical
+cp out/release/published/hauptmann2002chemical.ttl tests/fixture/hauptmann2002chemical/expected.ttl  # from a full run of the same dump
+make test-fixture
+```
+Check 3 compares triples only. Columns the mapping doesn't turn into RDF still travel in the dump, so
+look at the diff of `dump.sql` before committing it. Today these are internal uuids, codes, citation
+strings, `released_on` and a feature's name as recorded.
+
 ## Files
 - `scripts/compare_graphs.py`: two full graphs, same or what changed (schema rounds, planning#27)
 - `Makefile`, `scripts/stages/`: the stages (`measure.py` records memory and time, `changed.py` decides whether
@@ -126,6 +149,7 @@ with single example triples at most.
 - `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`)
 - `mapping/`: SQL views + R2RML ([`mapping/README.md`](mapping/README.md)), `pom.xml` (Ontop)
 - `Dockerfile`, `docker/`: the build image ([`docker/README.md`](docker/README.md))
+- `tests/fixture/`, `scripts/make_fixture.py`, `scripts/test_fixture.sh`: the public CI fixture (above)
 - `.github/workflows/ci.yml`: tests and image build, **without data** (the database never reaches GitHub)
 
 ## Licence
