@@ -4,7 +4,8 @@ name: ci
 # (planning#26). Runs against the real database happen on the data LXC (README.md).
 #   test-pipeline  package/publish rules (a failed check never replaces a release; the full graph
 #                  never goes into the release), deploy/run.sh control flow, shellcheck
-#   image          build image builds, and the same tests pass inside it
+#   image          build image builds, the same tests pass inside it, and a whole release runs on
+#                  the public fixture of a released publication (tests/fixture/, offline)
 on:
   pull_request:
   push:
@@ -28,8 +29,8 @@ jobs:
           python-version: "3.13"
       - run: "pip install --require-hashes --only-binary=:all: -r docker/requirements.txt"
       - run: make test-pipeline
-      - run: bash -n scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
-      - run: shellcheck -S warning scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh   # preinstalled on ubuntu-latest
+      - run: bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+      - run: shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh   # preinstalled on ubuntu-latest
       - run: make test-deploy
 
   image:
@@ -41,6 +42,8 @@ jobs:
         run: docker build --pull --build-arg PIPELINE_IMAGE=lod-am-pipeline:${{ github.sha }} -t lod-am-pipeline:ci .
       - name: Package tests in the image
         run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" lod-am-pipeline:ci test-pipeline
+      - name: A whole release on the public fixture, offline (scripts/test_fixture.sh)
+        run: docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/work" lod-am-pipeline:ci test-fixture
       - name: The image refuses root
         run: |
           if docker run --rm --user 0 -v "$PWD:/work" lod-am-pipeline:ci test-pipeline; then

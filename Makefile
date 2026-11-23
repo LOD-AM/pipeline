@@ -16,7 +16,7 @@ PY ?= python3
 ONTOP_LIB ?= $(CURDIR)/.cache/ontop/$(shell sha256sum mapping/pom.xml | cut -c1-16)
 export KG ONTOP_LIB
 
-.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot changed materialize enrich check publish package baseline compare test-pipeline test-deploy clean
+.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot changed materialize enrich check publish package baseline compare test-pipeline test-deploy test-fixture clean
 
 release: materialize enrich check publish package
 
@@ -68,6 +68,9 @@ compare:             ## $(BASELINE)/lod-am.ttl vs. out/internal/lod-am.ttl: same
 test-pipeline:       ## package/publish rules: a failed check never replaces a release (no database)
 	bash scripts/stages/test_pipeline.sh
 	bash scripts/test_compare_graphs.sh
+
+test-fixture:        ## a whole release on the public fixture tests/fixture/ (no private data; CI, in the image)
+	bash scripts/test_fixture.sh
 
 test-deploy:         ## deploy/run.sh control flow with stubbed docker and curl (no server needed)
 	bash deploy/test_deploy.sh
