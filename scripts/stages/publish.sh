@@ -19,7 +19,12 @@ keys=$($PSQL -d $DB -At -c "SELECT zotero_key FROM cau.literature
 
 for key in $keys; do
   [[ $key =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "FAIL: odd citation key: $key" >&2; exit 1; }
-  measure "export $key" python3 scripts/export_publication.py "$BUILD/lod-am.ttl" "$key" "$OUTDIR/$key.tmp.ttl" "$KG/tools/prefixes.ttl"
+done
+# One parse of the full graph for all publications: parsing it is most of an export's time
+# shellcheck disable=SC2086  # $keys: checked citation keys, one argument each
+measure "export" python3 scripts/export_publication.py "$BUILD/lod-am.ttl" --each "$OUTDIR" "$KG/tools/prefixes.ttl" $keys
+
+for key in $keys; do
   measure "check_terms $key" python3 "$KG/tools/check_terms.py" "$OUTDIR/$key.tmp.ttl"
   if ! measure "shacl $key" python3 "$KG/tools/validate.py" "$OUTDIR/$key.tmp.ttl" "$KG/data/vocab" > "$OUTDIR/$key.shacl"; then
     grep -v '^warning:' "$OUTDIR/$key.shacl" | head -40; echo "FAIL: SHACL violations in $key" >&2; exit 1
