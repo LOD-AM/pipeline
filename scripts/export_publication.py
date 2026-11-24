@@ -15,8 +15,11 @@ Selection, starting from the publication (found by its citation key, dcterms:ide
      only, never what is documented in it; owner 2026-11-19);
   3. a helper node <record>/<role> brings its record (e.g. a find without a feature points
      to its site's place, so the site comes along);
-  4. the only incoming links followed are sampling events (crmsci:O3_sampled_from /
-     crmsci:O5_removed) of selected objects and samples. Nothing else incoming: a site or
+  4. the only incoming link followed is the sampling event of a selected sample
+     (crmsci:O5_removed); the sample comes from one of the publication's analyses, and the event
+     brings the sampled object (O3_sampled_from, outgoing). Never the incoming O3_sampled_from of
+     a find: a find documented here can be analysed in another publication, and that sampling
+     event would bring the other publication's analysis (helper-node rule). Nothing else incoming: a site or
      feature never pulls in further finds of other publications.
 External resources (AAT, ChEBI, Wikidata, ROR, QUDT, ...) are kept as link targets only.
 
@@ -37,7 +40,7 @@ from rdflib.namespace import DCTERMS
 CRM = Namespace("http://www.cidoc-crm.org/cidoc-crm/")
 CRMSCI = Namespace("http://www.cidoc-crm.org/extensions/crmsci/")
 BASE = "https://lod-am.net/id/"
-SAMPLING_LINKS = (CRMSCI.O3_sampled_from, CRMSCI.O5_removed)
+SAMPLING_LINKS = (CRMSCI.O5_removed,)
 
 src, key, dest = sys.argv[1:4]
 prefixes = sys.argv[4] if len(sys.argv) > 4 else None
