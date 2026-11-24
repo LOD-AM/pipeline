@@ -9,6 +9,8 @@ as a fresh start without ingest's history (that history contains the database du
 - This repository is **public**. The research database as a whole is private until the owner
   releases it (ingest `CLAUDE.md`). Never commit a dump, a snapshot, generated RDF of the data,
   bulk extracts or reports of a real run (`out/` is gitignored). Single example rows are fine.
+  The one exception is `tests/fixture/`: a released publication's rows only, built by
+  `scripts/make_fixture.py` and proved public by `make test-fixture` (check 3); README "Public CI fixture".
 - Public CI has **no data**: the database is LAN-only (planning#26) and never reaches GitHub. Real
   runs happen on the data LXC. Never add a self-hosted runner (pull requests could run code there).
 - Only `out/release/` may leave the server, and it holds only released publications. Never put the
@@ -20,14 +22,16 @@ as a fresh start without ingest's history (that history contains the database du
 ```bash
 make test-pipeline                                   # package/publish rules, no database
 make test-deploy                                     # deploy/run.sh control flow (stubbed docker/curl)
-bash -n scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
-shellcheck -S warning scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+make test-fixture                                    # whole release on tests/fixture/ (needs `make fetch` outside the image)
+bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
 bash scripts/check_shared_block.sh                   # shared block vs knowledge-graph
 ```
 A full run needs a dump: `make fetch`, then `make release DUMP=<dump.sql> KG=../knowledge-graph`
 (PostgreSQL 16 + PostGIS, Java 17+, Maven, Python from `docker/requirements.txt`). In a cloud
 session the private dump is in a checkout of LOD-AM/ingest (`lod-am.sql`), if that repo is
-attached: use it only locally, never copy anything from it into this repo. There is no Docker daemon in
+attached: use it only locally, never copy anything from it into this repo (except through
+`scripts/make_fixture.py`, see Confidentiality). There is no Docker daemon in
 cloud sessions; CI builds the image. A converter change must keep the full graph's
 `canonical_sha256` (`out/internal/manifest.json`) unchanged unless the change is meant to alter
 the graph: say which triples change and why in the PR.
@@ -63,8 +67,8 @@ the graph: say which triples change and why in the PR.
   flag `cau.literature.released_on` is the only release switch; `analysed_element`, codes, reference tables; analysis
   remarks as `P3_has_note`, full graph `4289f5d3…`), site point as `site.geometry` (5). A view change lands together
   with the owner's run of the round's SQL (the nightly run pulls `main`).
-- Next: round 4 (reported ids only, after the owner's review), round 6 (helper views); a public fixture (from the
-  released `hauptmann2002chemical`) so CI can run a whole release without private data.
+- Next: round 4 (reported ids only, after the owner's review); after each round, rebuild `tests/fixture/`
+  (README "Public CI fixture"). Since 2026-11-23 CI runs a whole release on that fixture (planning#36).
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
