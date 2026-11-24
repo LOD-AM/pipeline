@@ -20,8 +20,10 @@ The manifest traces every file to its inputs (planning#3 "Done when"):
   zotero          group and library version of the snapshot
   publications    per released publication: file, triples, sha256, canonical sha256, SHACL result
   checks          full graph: terms, SHACL (violations 0), source rows vs. output: passed
-The internal manifest adds the full graph's triples, hashes, SHACL warning count and skipped rows;
-the public one leaves out these figures about the unreleased database.
+The internal manifest adds the full graph's triples, hashes, SHACL warning count and skipped rows,
+and the peak memory and duration of each heavy step (out/.build/resources.jsonl, written by
+scripts/stages/measure.py; planning#6), so that the growth of the database shows up run by run.
+The public one leaves out these figures about the unreleased database.
 With RELEASE_STRICT=1 the stage refuses uncommitted code, and a source it cannot trace (a dump file
 neither committed nor a snapshot), so that the manifest really describes the release.
 
@@ -32,6 +34,7 @@ import hashlib
 import json
 import os
 import re
+import resource
 import shutil
 import subprocess
 import sys
@@ -108,6 +111,16 @@ def ontop_version():
     return v
 
 
+def resources():
+    """Peak memory and duration per step, plus this stage's own peak."""
+    f = BUILD / "resources.jsonl"
+    steps = [json.loads(l) for l in f.read_text(encoding="utf-8").splitlines() if l.strip()] if f.exists() else []
+    steps.append({"step": "package", "peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)})
+    peak = max(steps, key=lambda s: s["peak_rss_mb"])
+    return {"peak_rss_mb": peak["peak_rss_mb"], "peak_step": peak["step"],
+            "seconds": round(sum(s.get("seconds", 0) for s in steps)), "steps": steps}
+
+
 def swap(stage, dest):
     prev = dest.with_name(dest.name + ".prev")
     if dest.exists():
@@ -156,6 +169,7 @@ def main():
     internal["graph"] = {"file": "lod-am.ttl", "triples": triples, "sha256": sha256(BUILD / "lod-am.ttl"),
                          "canonical_sha256": canon}
     internal["checks"] = checks
+    internal["resources"] = res = resources()
 
     if os.environ.get("RELEASE_STRICT") == "1":
         src = public["source"]
@@ -181,7 +195,8 @@ def main():
     swap(rel, ROOT / "out" / "release")
     print(f"package: out/release/ ({len(pubs)} publication(s): {', '.join(p['key'] for p in pubs)}), "
           f"out/internal/ ({triples} triples, {checks['shacl']['warnings']} SHACL warnings, "
-          f"zotero v{public['zotero']['library_version']})")
+          f"zotero v{public['zotero']['library_version']}); peak memory {res['peak_rss_mb']} MB ({res['peak_step']}), "
+          f"{res['seconds']} s in measured steps")
 
 
 if __name__ == "__main__":

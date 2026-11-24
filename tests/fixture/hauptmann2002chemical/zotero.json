@@ -1,0 +1,327 @@
+[
+{
+"data": {
+"DOI": "https://doi.org/10.3406/paleo.2002.4745",
+"ISSN": "",
+"PMCID": "",
+"PMID": "",
+"abstractNote": "",
+"accessDate": "",
+"archive": "",
+"archiveLocation": "",
+"callNumber": "",
+"citationKey": "hauptmann2002chemical",
+"collections": [],
+"creators": [
+{
+"creatorType": "author",
+"firstName": "Andreas",
+"lastName": "Hauptmann"
+},
+{
+"creatorType": "author",
+"firstName": "Sigrid",
+"lastName": "Schmitt-Strecker"
+},
+{
+"creatorType": "author",
+"firstName": "Friedrich",
+"lastName": "Begemann"
+},
+{
+"creatorType": "author",
+"firstName": "Alberto M",
+"lastName": "Palmieri"
+}
+],
+"date": "2002",
+"dateAdded": "2026-11-16T16:17:27Z",
+"dateModified": "2026-11-19T21:22:15Z",
+"extra": "",
+"issue": "",
+"itemType": "journalArticle",
+"journalAbbreviation": "",
+"key": "TXXTL54F",
+"language": "",
+"libraryCatalog": "",
+"pages": "43–69",
+"partNumber": "",
+"partTitle": "",
+"place": "",
+"publicationTitle": "Paléorient",
+"publisher": "JSTOR",
+"relations": {},
+"rights": "",
+"section": "",
+"series": "",
+"seriesText": "",
+"seriesTitle": "",
+"shortTitle": "",
+"tags": [],
+"title": "Chemical composition and lead isotopy of metal objects from the \"Royal\" Tomb and other related finds at Arslantepe, Eastern Anatolia",
+"url": "",
+"version": 59,
+"volume": ""
+},
+"key": "TXXTL54F",
+"library": {
+"id": 6765723,
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/groups/lod-am",
+"type": "text/html"
+}
+},
+"name": "LOD-AM",
+"type": "group"
+},
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/groups/lod-am/items/TXXTL54F",
+"type": "text/html"
+},
+"self": {
+"href": "https://api.zotero.org/groups/6765723/items/TXXTL54F",
+"type": "application/json"
+}
+},
+"meta": {
+"createdByUser": {
+"id": 4714437,
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/ffricke",
+"type": "text/html"
+}
+},
+"name": "Fabian Fricke",
+"username": "FFricke"
+},
+"creatorSummary": "Hauptmann et al.",
+"numChildren": 0,
+"parsedDate": "2002"
+},
+"version": 59
+},
+{
+"data": {
+"DOI": "",
+"ISBN": "",
+"ISSN": "",
+"abstractNote": "",
+"accessDate": "",
+"archive": "",
+"archiveLocation": "",
+"callNumber": "",
+"citationKey": "rothman2002tepe",
+"collections": [],
+"creators": [
+{
+"creatorType": "author",
+"firstName": "Mitchell S",
+"lastName": "Rothman"
+},
+{
+"creatorType": "author",
+"firstName": "Brian",
+"lastName": "Peasnall"
+}
+],
+"date": "2002",
+"dateAdded": "2026-11-16T16:17:27Z",
+"dateModified": "2026-11-16T16:17:27Z",
+"edition": "",
+"extra": "",
+"format": "",
+"itemType": "book",
+"key": "UGZKRDY5",
+"language": "",
+"libraryCatalog": "",
+"numPages": "",
+"numberOfVolumes": "",
+"originalDate": "",
+"originalPlace": "",
+"originalPublisher": "",
+"place": "Pennsylvania",
+"publisher": "UPenn Museum of Archaeology",
+"relations": {},
+"rights": "",
+"series": "University Museum Monographs",
+"seriesNumber": "",
+"shortTitle": "",
+"tags": [],
+"title": "Tepe Gawra: the evolution of a small, prehistoric center in northern Iraq",
+"url": "",
+"version": 32,
+"volume": "112"
+},
+"key": "UGZKRDY5",
+"library": {
+"id": 6765723,
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/groups/lod-am",
+"type": "text/html"
+}
+},
+"name": "LOD-AM",
+"type": "group"
+},
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/groups/lod-am/items/UGZKRDY5",
+"type": "text/html"
+},
+"self": {
+"href": "https://api.zotero.org/groups/6765723/items/UGZKRDY5",
+"type": "application/json"
+}
+},
+"meta": {
+"createdByUser": {
+"id": 4714437,
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/ffricke",
+"type": "text/html"
+}
+},
+"name": "Fabian Fricke",
+"username": "FFricke"
+},
+"creatorSummary": "Rothman and Peasnall",
+"numChildren": 0,
+"parsedDate": "2002"
+},
+"version": 32
+},
+{
+"data": {
+"DOI": "",
+"ISSN": "",
+"PMCID": "",
+"PMID": "",
+"abstractNote": "",
+"accessDate": "",
+"archive": "",
+"archiveLocation": "",
+"callNumber": "",
+"citationKey": "vignola2019changes",
+"collections": [],
+"creators": [
+{
+"creatorType": "author",
+"firstName": "C",
+"lastName": "Vignola"
+},
+{
+"creatorType": "author",
+"firstName": "F",
+"lastName": "Marzaioli"
+},
+{
+"creatorType": "author",
+"firstName": "F",
+"lastName": "Balossi Restelli"
+},
+{
+"creatorType": "author",
+"firstName": "Gian Maria",
+"lastName": "Di Nocera"
+},
+{
+"creatorType": "author",
+"firstName": "M",
+"lastName": "Frangipane"
+},
+{
+"creatorType": "author",
+"firstName": "A",
+"lastName": "Masi"
+},
+{
+"creatorType": "author",
+"firstName": "I",
+"lastName": "Passariello"
+},
+{
+"creatorType": "author",
+"firstName": "L",
+"lastName": "Sadori"
+},
+{
+"creatorType": "author",
+"firstName": "F",
+"lastName": "Terrasi"
+}
+],
+"date": "2019",
+"dateAdded": "2026-11-16T16:17:27Z",
+"dateModified": "2026-11-16T16:17:27Z",
+"extra": "",
+"issue": "456",
+"itemType": "journalArticle",
+"journalAbbreviation": "",
+"key": "UZFCKPFS",
+"language": "",
+"libraryCatalog": "",
+"pages": "276-282",
+"partNumber": "",
+"partTitle": "",
+"place": "",
+"publicationTitle": "Nuclear Instruments and Methods in Physics Research Section B: Beam Interactions with Materials and Atoms",
+"publisher": "",
+"relations": {},
+"rights": "",
+"section": "",
+"series": "",
+"seriesText": "",
+"seriesTitle": "",
+"shortTitle": "",
+"tags": [],
+"title": "Changes in the Near Eastern chronology between the 5th and the 3rd millennium BC: New AMS 14C dates from Arslantepe (Turkey)",
+"url": "",
+"version": 36,
+"volume": ""
+},
+"key": "UZFCKPFS",
+"library": {
+"id": 6765723,
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/groups/lod-am",
+"type": "text/html"
+}
+},
+"name": "LOD-AM",
+"type": "group"
+},
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/groups/lod-am/items/UZFCKPFS",
+"type": "text/html"
+},
+"self": {
+"href": "https://api.zotero.org/groups/6765723/items/UZFCKPFS",
+"type": "application/json"
+}
+},
+"meta": {
+"createdByUser": {
+"id": 4714437,
+"links": {
+"alternate": {
+"href": "https://www.zotero.org/ffricke",
+"type": "text/html"
+}
+},
+"name": "Fabian Fricke",
+"username": "FFricke"
+},
+"creatorSummary": "Vignola et al.",
+"numChildren": 0,
+"parsedDate": "2019"
+},
+"version": 36
+}
+]

@@ -9,24 +9,29 @@ as a fresh start without ingest's history (that history contains the database du
 - This repository is **public**. The research database as a whole is private until the owner
   releases it (ingest `CLAUDE.md`). Never commit a dump, a snapshot, generated RDF of the data,
   bulk extracts or reports of a real run (`out/` is gitignored). Single example rows are fine.
+  The one exception is `tests/fixture/`: a released publication's rows only, built by
+  `scripts/make_fixture.py` and proved public by `make test-fixture` (check 3); README "Public CI fixture".
 - Public CI has **no data**: the database is LAN-only (planning#26) and never reaches GitHub. Real
   runs happen on the data LXC. Never add a self-hosted runner (pull requests could run code there).
 - Only `out/release/` may leave the server, and it holds only released publications. Never put the
   full graph or figures about it (triple counts, skip or SHACL counts) into the release.
 - Which publications are released is the owner's decision, recorded in the database
-  (`cau.literature.released_on`, planning#27; until then `config/released-publications.txt`).
-  Change that file only on the owner's word.
+  (`cau.literature.released_on`, planning#27 round 3). Set or change it only on the owner's word.
 
 ## Checks
 ```bash
 make test-pipeline                                   # package/publish rules, no database
-bash -n scripts/stages/*.sh docker/entrypoint.sh
+make test-deploy                                     # deploy/run.sh control flow (stubbed docker/curl)
+make test-fixture                                    # whole release on tests/fixture/ (needs `make fetch` outside the image)
+bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
 bash scripts/check_shared_block.sh                   # shared block vs knowledge-graph
 ```
 A full run needs a dump: `make fetch`, then `make release DUMP=<dump.sql> KG=../knowledge-graph`
 (PostgreSQL 16 + PostGIS, Java 17+, Maven, Python from `docker/requirements.txt`). In a cloud
 session the private dump is in a checkout of LOD-AM/ingest (`lod-am.sql`), if that repo is
-attached: use it only locally, never copy anything from it into this repo. There is no Docker daemon in
+attached: use it only locally, never copy anything from it into this repo (except through
+`scripts/make_fixture.py`, see Confidentiality). There is no Docker daemon in
 cloud sessions; CI builds the image. A converter change must keep the full graph's
 `canonical_sha256` (`out/internal/manifest.json`) unchanged unless the change is meant to alter
 the graph: say which triples change and why in the PR.
@@ -42,22 +47,36 @@ the graph: say which triples change and why in the PR.
   by `KG_COMMIT`). Dependabot proposes bumps; bump `KG_COMMIT` by hand, in its own PR.
 - Licence: MIT (`LICENSE`, owner 2026-11-21), the same text as knowledge-graph's code licence.
 
-## Where to resume (state 2026-11-21)
+## Where to resume (state 2026-11-22, evening)
 - Moved from ingest (LOD-AM/ingest#47: stages, manifest, build image; verified there: image in CI
   gave the same graph as local runs, canonical sha256 `b82fc318…`, 331,903 triples). New here:
   `snapshot` and `publish` stages, release = released publications only, `out/internal/`.
-- Next: planning#6 (scheduled run on the data LXC, owner sets up the read-only role and Docker,
-  planning#26), planning#7 (triplestore pulls the release), the release flag in the database
-  (planning#27 round 3), a public fixture (from the released `hauptmann2002chemical`) so CI can run
-  a whole release without private data.
-- Add this repository to the shared block in knowledge-graph `CLAUDE.md`, then copy it everywhere.
+- Data LXC (owner, 2026-11-22): read-only role, Docker, first complete run by hand: full graph
+  `canonical_sha256` `b82fc318…`, 331,903 triples, identical to the ingest dump's graph. The first attempt was
+  killed for lack of memory (exit 137 in the term check at 1 GB); the LXC now has 3 GB RAM + 1 GB swap. Scheduled run: `deploy/` (planning#6), installed by the owner with `deploy/install.sh`.
+- Chain live since 2026-11-22 (planning#3): nightly run 03:17 → `deploy/run.sh` copies each release to
+  `LODAM_PUBLISH_DIR` (/srv/lodam/release, world-readable) → webhook POST /lodam-release (bearer token,
+  `{"manifest_sha256"}`) → the triplestore pulls with rsync over SSH (`rrsync -ro`, LOD-AM/triplestore
+  `scripts/update_published.sh`), loads it and hands it to the website as a "Data release" PR. Peak memory
+  1.27 GB (SHACL), a run takes ~40 min. Exports use knowledge-graph's canonical prefixes (#14), so the same
+  triples give the same file. Still to confirm (planning#33): a run with nothing new ends with `unchanged`.
+- Alerts on failure (planning#34): `deploy/alert.sh` via `OnFailure=lodam-alert@%n` in `lodam-pipeline.service`
+  (curl SMTP, `LODAM_ALERT_*` in `.env`; identical copy in LOD-AM/triplestore). Live and tested by the owner (2026-11-22).
+- Database overhaul (planning#27): the views follow ingest's schema rounds; each round is checked with `make baseline` /
+  `make compare` (README "Schema rounds"). Done: renames (round 1), constraints (2), explicit semantics (3: the release
+  flag `cau.literature.released_on` is the only release switch; `analysed_element`, codes, reference tables; analysis
+  remarks as `P3_has_note`, full graph `4289f5d3…`), site point as `site.geometry` (5). A view change lands together
+  with the owner's run of the round's SQL (the nightly run pulls `main`).
+- Next: round 4 (reported ids only, after the owner's review); after each round, rebuild `tests/fixture/`
+  (README "Public CI fixture"). Since 2026-11-23 CI runs a whole release on that fixture (planning#36).
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
 LOD-AM = Linked Open Data for Ancient Metallurgy, a one-person research project (https://lod-am.net).
 - `LOD-AM/knowledge-graph`: data model, vocabularies, converters, data. **Authority for all modelling rules** (`CONVENTIONS.md`).
 - `LOD-AM/triplestore`: Apache Jena Fuseki (Docker) that serves the knowledge graph.
-- `LOD-AM/ingest` (**private**): the owner's research database (dump), converter (R2RML) and its output; the database as a whole stays private until the owner says otherwise.
+- `LOD-AM/ingest` (**private**): the owner's research database (dump), its checks and correction rounds; the database as a whole stays private until the owner says otherwise.
+- `LOD-AM/pipeline`: the data pipeline, code only (database snapshot → R2RML/Ontop → enrichment → checks → released publications); runs on the data LXC, never with data on GitHub.
 - `LOD-AM/website`: Eleventy site and blog, self-hosted.
 - `LOD-AM/planning` (**private**): project management for all repos: one issue per task, state in labels (see its README).
 - `LOD-AM/ontologies`, `vocabularies`, `converter`: **superseded** by knowledge-graph; don't edit.

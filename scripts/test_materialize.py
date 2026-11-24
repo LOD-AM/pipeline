@@ -65,8 +65,8 @@ for s in expected_sites:
     places = list(g.objects(s, CRM.P53_has_former_or_current_location))
     if len(labels) != 1 or len(places) != 1:
         errors.append(f"{s}: {len(labels)} @en labels, {len(places)} places")
-with_geom = iris("site", "SELECT s.id_uuid FROM cau.site s JOIN cau.geography g USING (geography_id) "
-                 "WHERE g.geography IS NOT NULL AND nullif(btrim(s.site_latin), '') IS NOT NULL")
+with_geom = iris("site", "SELECT s.id_uuid FROM cau.site s "
+                 "WHERE s.geometry IS NOT NULL AND nullif(btrim(s.site_latin), '') IS NOT NULL")
 same("site and region places with geometry",
      {URIRef(f"{s}/location") for s in with_geom} | iris("region", "SELECT id_uuid FROM cau.region WHERE geography IS NOT NULL"),
      {p for p in g.subjects(GEO.hasGeometry, None)})
@@ -109,29 +109,29 @@ print(f"ok   native-name labels checked: {len(native)}")
 same("regions (E53_Place with label)", iris("region", "SELECT id_uuid FROM cau.region"),
      {s for s in g.subjects(RDF.type, CRM.E53_Place) if str(s).startswith(BASE + "region/")})
 TYPOLOGY = ("SELECT id_uuid FROM cau.type UNION ALL SELECT id_uuid FROM cau.type_group "
-            "UNION ALL SELECT id_uuid FROM cau.find_character")
+            "UNION ALL SELECT id_uuid FROM cau.find_class")
 local_e55 = {s for s in g.subjects(RDF.type, CRM.E55_Type) if str(s).startswith(BASE + "type/")}
 same("site/feature types and typology (E55_Type)",
-     iris("type", "SELECT id_uuid FROM cau.site_interpretation") | iris("type", TYPOLOGY)
-     | iris("type", "SELECT id_uuid FROM cau.part WHERE part_id <> 0"), local_e55)
+     iris("type", "SELECT id_uuid FROM cau.context_type") | iris("type", TYPOLOGY)
+     | iris("type", "SELECT id_uuid FROM cau.part WHERE code IS DISTINCT FROM 'whole_object'"), local_e55)
 TYPOLOGY_IRI = URIRef(BASE + "typology")
 same("typology concepts in :typology", iris("type", TYPOLOGY), set(g.subjects(SKOS.inScheme, TYPOLOGY_IRI)))
 exp_broader = set()
 for c, b in sql("SELECT t.id_uuid, coalesce(g.id_uuid, fc.id_uuid) FROM cau.type t LEFT JOIN cau.type_group g USING (type_group_id) "
-                "JOIN cau.find_character fc ON fc.find_character_id = t.find_character_id "
+                "JOIN cau.find_class fc ON fc.find_class_id = t.find_class_id "
                 "UNION ALL SELECT g.id_uuid, coalesce(b.id_uuid, fc.id_uuid) FROM cau.type_group g "
                 "LEFT JOIN cau.type_group b ON b.type_group_id = g.broader_type_group_id "
-                "LEFT JOIN cau.find_character fc ON fc.find_character_id = g.find_character_id"):
+                "LEFT JOIN cau.find_class fc ON fc.find_class_id = g.find_class_id"):
     exp_broader.add((URIRef(f"{BASE}type/{c}"), URIRef(f"{BASE}type/{b}")))
 same("typology skos:broader", exp_broader, set(g.subject_objects(SKOS.broader)))
-same("typology top concepts (classes)", iris("type", "SELECT id_uuid FROM cau.find_character"),
+same("typology top concepts (classes)", iris("type", "SELECT id_uuid FROM cau.find_class"),
      set(g.subjects(SKOS.topConceptOf, TYPOLOGY_IRI)))
 for kind, pred in (("closeMatch", SKOS.closeMatch), ("broadMatch", SKOS.broadMatch)):
     exp = {(URIRef(f"{BASE}type/{u}"), URIRef(f"http://vocab.getty.edu/aat/{a}"))
-           for u, a in sql(f"SELECT id_uuid, aat_id FROM cau.site_interpretation WHERE aat_match = '{kind}' "
+           for u, a in sql(f"SELECT id_uuid, aat_id FROM cau.context_type WHERE aat_match = '{kind}' "
                            f"UNION ALL SELECT id_uuid, aat_id FROM cau.type WHERE aat_match = '{kind}' "
                            f"UNION ALL SELECT id_uuid, aat_id FROM cau.type_group WHERE aat_match = '{kind}' "
-                           f"UNION ALL SELECT id_uuid, aat_id FROM cau.find_character WHERE aat_match = '{kind}'")}
+                           f"UNION ALL SELECT id_uuid, aat_id FROM cau.find_class WHERE aat_match = '{kind}'")}
     same(f"type AAT {kind}", exp, set(g.subject_objects(pred)))
 
 # Features: all, with labels; A2 exactly for those with finds; part of the site and the kurgan
@@ -154,25 +154,25 @@ same("feature → kurgan", {(URIRef(f"{BASE}feature/{f}"), URIRef(f"{BASE}featur
 
 # Dating: features and site periods witness their phase only; the culture consists of its phases (ingest#17)
 exp_dating = set()
-for kind, q in (("feature", "SELECT f.id_uuid, z.id_uuid FROM cau.feature f JOIN cau.zt z USING (period_id)"),
+for kind, q in (("feature", "SELECT f.id_uuid, z.id_uuid FROM cau.feature f JOIN cau.period z USING (period_id)"),
                 ("site", "SELECT s.id_uuid, z.id_uuid FROM cau.site_period p JOIN cau.site s USING (site_id) "
-                         "JOIN cau.zt z USING (period_id)")):
+                         "JOIN cau.period z USING (period_id)")):
     for u, z in sql(q):
         exp_dating.add((URIRef(f"{BASE}{kind}/{u}"), URIRef(f"{BASE}period/{z}")))
 same("dating (P8i_witnessed → phase)", exp_dating, set(g.subject_objects(CRM.P8i_witnessed)))
 phases = {(URIRef(f"{BASE}period/{z}"), URIRef(f"{BASE}culture/{c}")) for z, c in
-          sql("SELECT z.id_uuid, c.id_uuid FROM cau.zt z JOIN cau.culture c USING (culture_id)")}
+          sql("SELECT z.id_uuid, c.id_uuid FROM cau.period z JOIN cau.culture c USING (culture_id)")}
 same("phase → culture (P9i)", phases, set(g.subject_objects(CRM.P9i_forms_part_of)) - {
      (a, b) for a, b in g.subject_objects(CRM.P9i_forms_part_of) if "/period/" not in str(a)})
 same("culture → phase (P9)", {(c, z) for z, c in phases}, set(g.subject_objects(CRM.P9_consists_of)))
 same("phase → chronology (skos:inScheme)", {(URIRef(f"{BASE}period/{z}"), URIRef(f"{BASE}chronology/{t}")) for z, t in
-     sql("SELECT z.id_uuid, t.id_uuid FROM cau.zt z JOIN cau.zt_type t USING (zt_type_id)")},
+     sql("SELECT z.id_uuid, t.id_uuid FROM cau.period z JOIN cau.chronology_system t USING (chronology_system_id)")},
      {(a, b) for a, b in g.subject_objects(SKOS.inScheme) if "/chronology/" in str(b)})
-same("periods (zt, E4 with time-span)", iris("period", "SELECT id_uuid FROM cau.zt WHERE min IS NOT NULL AND max IS NOT NULL"),
+same("periods (period, E4 with time-span)", iris("period", "SELECT id_uuid FROM cau.period WHERE min IS NOT NULL AND max IS NOT NULL"),
      {s for s in g.subjects(RDF.type, CRM.E4_Period) if "/period/" in str(s)})
 same("cultures (E4)", iris("culture", "SELECT id_uuid FROM cau.culture"),
      {s for s in g.subjects(RDF.type, CRM.E4_Period) if "/culture/" in str(s)})
-for u, lo, hi in sql("SELECT id_uuid, trim_scale(min)::text, trim_scale(max)::text FROM cau.zt WHERE min IS NOT NULL"):
+for u, lo, hi in sql("SELECT id_uuid, trim_scale(min)::text, trim_scale(max)::text FROM cau.period WHERE min IS NOT NULL"):
     ts = URIRef(f"{BASE}period/{u}/time_span")
     got = (str(g.value(ts, CRM.P79_beginning_is_qualified_by)), str(g.value(ts, CRM.P80_end_is_qualified_by)))
     if got != (f"-{lo}", f"-{hi}"):
@@ -182,12 +182,13 @@ for u, lo, hi in sql("SELECT id_uuid, trim_scale(min)::text, trim_scale(max)::te
 # with the number as reported, the drawing number where it differs, and the remarks as a note
 finds = iris("find", "SELECT id_uuid FROM cau.find")
 parts = {URIRef(f"{BASE}find/{u}/{p}") for u, p in sql(
-    "SELECT DISTINCT x.id_uuid, lower(replace(pt.part_en, ' ', '_')) FROM (SELECT site_id, find_id, part_id FROM cau.ca "
-    "UNION SELECT site_id, find_id, part_id FROM cau.pb) a JOIN cau.find x USING (site_id, find_id) "
-    "JOIN cau.part pt USING (part_id) WHERE a.part_id <> 0")}
+    "SELECT DISTINCT x.id_uuid, lower(replace(pt.part_en, ' ', '_')) FROM (SELECT site_id, find_id, part_id FROM cau.chemical_analysis "
+    "UNION SELECT site_id, find_id, part_id FROM cau.lead_isotope_analysis) a JOIN cau.find x USING (site_id, find_id) "
+    "JOIN cau.part pt USING (part_id) WHERE pt.code IS DISTINCT FROM 'whole_object'")}
 same("finds and object parts (E22)", finds | parts, set(g.subjects(RDF.type, CRM["E22_Human-Made_Object"])))
-same("material of analysed copper-base finds (P45)", iris("find", "SELECT DISTINCT x.id_uuid FROM cau.find x JOIN cau.ca c "
-     "USING (site_id, find_id) WHERE c.main_id = 1"), set(g.subjects(CRM.P45_consists_of, URIRef("http://vocab.getty.edu/aat/300241441"))))
+same("material of the finds (P45, find.material_id → its AAT id)", {(URIRef(f"{BASE}find/{u}"), URIRef(f"http://vocab.getty.edu/aat/{a}")) for u, a in sql(
+     "SELECT x.id_uuid, m.aat_id FROM cau.find x JOIN cau.material m USING (material_id) WHERE m.aat_id IS NOT NULL")},
+     set(g.subject_objects(CRM.P45_consists_of)))
 for x in finds:
     if not any(isinstance(o, Literal) and o.language == "en" for o in g.objects(x, RDFS.label)):
         errors.append(f"{x}: no @en label")
@@ -203,8 +204,8 @@ same("finds at the site's place (P53)", {(URIRef(f"{BASE}find/{u}"), URIRef(f"{B
      {(a, b) for a, b in g.subject_objects(CRM.P53_has_former_or_current_location) if a in finds})
 OLD, DRAW = URIRef(BASE + "old_identifier"), URIRef(BASE + "drawing_number")
 for u, old, drawing, note in [r + [""] * (4 - len(r)) for r in sql(
-        "SELECT x.id_uuid, coalesce(nullif(btrim(x.find_old), ''), ''), "
-        "CASE WHEN nullif(btrim(x.ref), '') NOT IN (coalesce(nullif(btrim(x.find_old), ''), ''), x.find_id::text) THEN btrim(x.ref) ELSE '' END, "
+        "SELECT x.id_uuid, coalesce(nullif(btrim(x.find_no_reported), ''), ''), "
+        "CASE WHEN nullif(btrim(x.drawing_no_reported), '') NOT IN (coalesce(nullif(btrim(x.find_no_reported), ''), ''), x.find_id::text) THEN btrim(x.drawing_no_reported) ELSE '' END, "
         "coalesce(nullif(btrim(x.remarks), ''), '') FROM cau.find x")]:
     f = URIRef(f"{BASE}find/{u}")
     ids = {(g.value(i, CRM.P2_has_type), str(g.value(i, CRM.P190_has_symbolic_content))) for i in g.objects(f, CRM.P1_is_identified_by)}
@@ -221,21 +222,27 @@ AFX = Namespace("http://purl.allotrope.org/ontologies/property#")
 AFR = Namespace("http://purl.allotrope.org/ontologies/result#")
 QUDT = Namespace("http://qudt.org/schema/qudt#")
 CRMS = Namespace("http://www.cidoc-crm.org/extensions/crmsci/")
-analyses = iris("analysis", "SELECT id_uuid FROM cau.ca UNION ALL SELECT id_uuid FROM cau.pb")
+analyses = iris("analysis", "SELECT id_uuid FROM cau.chemical_analysis UNION ALL SELECT id_uuid FROM cau.lead_isotope_analysis")
 same("analyses (E7)", analyses, set(g.subjects(RDF.type, CRM.E7_Activity)))
+same("remarks of analyses as notes (P3, owner 2026-11-22)", {(URIRef(f"{BASE}analysis/{u}"), Literal(n)) for u, n in sql(
+     "SELECT id_uuid, btrim(remarks) FROM cau.chemical_analysis WHERE btrim(coalesce(remarks, '')) <> '' "
+     "UNION ALL SELECT id_uuid, btrim(remarks) FROM cau.lead_isotope_analysis WHERE btrim(coalesce(remarks, '')) <> ''")},
+     {(a, n) for a, n in g.subject_objects(CRM.P3_has_note) if str(a).startswith(BASE + "analysis/")})
 same("samples (S13), one per analysis", {URIRef(f"{a}/sample") for a in analyses}, set(g.subjects(RDF.type, CRMS.S13_Sample)))
 same("analysis → sample (has input)", {(a, URIRef(f"{a}/sample")) for a in analyses}, set(g.subject_objects(AFX.AFX_0000399)))
 same("analysis → lab", {(URIRef(f"{BASE}analysis/{a}"), URIRef(f"{BASE}lab/{l}")) for a, l in sql(
-     "SELECT a.id_uuid, l.id_uuid FROM (SELECT id_uuid, lab_id FROM cau.ca UNION ALL SELECT id_uuid, lab_id FROM cau.pb) a "
+     "SELECT a.id_uuid, l.id_uuid FROM (SELECT id_uuid, lab_id FROM cau.chemical_analysis UNION ALL SELECT id_uuid, lab_id FROM cau.lead_isotope_analysis) a "
      "JOIN cau.lab l USING (lab_id)")}, set(g.subject_objects(CRM.P14_carried_out_by)))
 ELEMENTS = ["cu", "sn", "pb", "zn", "bi", "ag", "sb", "as", "fe", "ni", "co", "mn", "au", "p", "te", "se", "s"]
-rows = sql("SELECT id_uuid, literature_id, main_id, " + ", ".join(f'coalesce("{e}"::text, \'-\')' for e in ELEMENTS) + " FROM cau.ca")
-analysed = {(r[1], e) for r in rows for i, e in enumerate(ELEMENTS) if r[3 + i] != "-"}
+rows = sql("SELECT c.id_uuid, c.literature_id, coalesce(m.code, ''), " + ", ".join(f'coalesce(c."{e}"::text, \'-\')' for e in ELEMENTS)
+           + " FROM cau.chemical_analysis c JOIN cau.find x USING (site_id, find_id) LEFT JOIN cau.material m ON m.material_id = x.material_id")
+# which elements each publication analysed: the owner's list (cau.analysed_element, planning#27 round 3)
+analysed = {(r[0], r[1]) for r in sql("SELECT literature_id, element_code FROM cau.analysed_element")}
 exp_value, exp_nd = {}, set()
 for r in rows:
     for i, e in enumerate(ELEMENTS):
         v = r[3 + i]
-        if e == "cu" and r[2] == "1":
+        if e == "cu" and r[2] == "copper_base":
             continue                                  # all Cu of copper-base objects dropped (ingest#4)
         m = URIRef(f"{BASE}analysis/{r[0]}/{e}")
         if v != "-":
@@ -254,7 +261,7 @@ if any(str(m).endswith("/cu") for m in measurements):
 RATIOS = [("pb206_pb204", "pb206_204"), ("pb207_pb204", "pb207_204"), ("pb208_pb204", "pb208_204"),
           ("pb207_pb206", "pb207_206"), ("pb208_pb206", "pb208_206"), ("pb204_pb206", "pb204_206")]
 exp_ratios = {}
-for r in sql("SELECT id_uuid, " + ", ".join(f"coalesce({c}::text, '-')" for _, c in RATIOS) + " FROM cau.pb"):
+for r in sql("SELECT id_uuid, " + ", ".join(f"coalesce({c}::text, '-')" for _, c in RATIOS) + " FROM cau.lead_isotope_analysis"):
     for i, (name, _) in enumerate(RATIOS):
         if r[1 + i] != "-":
             exp_ratios[URIRef(f"{BASE}analysis/{r[0]}/{name}")] = r[1 + i]
@@ -284,15 +291,15 @@ if set(pub_by_key) != keys:
 else:
     print(f"ok   publications (FaBiO, one per literature row): {len(keys)}")
 for kind, q in (("find", "SELECT x.id_uuid, l.zotero_key FROM cau.find x JOIN cau.literature l USING (literature_id)"),
-                ("analysis", "SELECT a.id_uuid, l.zotero_key FROM (SELECT id_uuid, literature_id FROM cau.ca UNION ALL "
-                             "SELECT id_uuid, literature_id FROM cau.pb) a JOIN cau.literature l USING (literature_id)")):
+                ("analysis", "SELECT a.id_uuid, l.zotero_key FROM (SELECT id_uuid, literature_id FROM cau.chemical_analysis UNION ALL "
+                             "SELECT id_uuid, literature_id FROM cau.lead_isotope_analysis) a JOIN cau.literature l USING (literature_id)")):
     exp = {(URIRef(f"{BASE}{kind}/{u}"), pub_by_key.get(k)) for u, k in sql(q)}
     got = {(a, b) for a, b in g.subject_objects(CRM.P70i_is_documented_in) if f"/{kind}/" in str(a) and str(a).count("/") == 5}
     same(f"{kind} → publication (P70i)", exp, got)
 # Chronology systems name their source publication (dcterms:source, owner 2026-11-19)
 same("chronology → publication (dcterms:source)",
      {(URIRef(f"{BASE}chronology/{u}"), pub_by_key.get(k)) for u, k in
-      sql("SELECT t.id_uuid, l.zotero_key FROM cau.zt_type t JOIN cau.literature l USING (literature_id)")},
+      sql("SELECT t.id_uuid, l.zotero_key FROM cau.chronology_system t JOIN cau.literature l USING (literature_id)")},
      {(a, b) for a, b in g.subject_objects(DCT.source) if "/chronology/" in str(a)})
 
 if errors:

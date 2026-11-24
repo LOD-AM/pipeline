@@ -43,7 +43,7 @@ jdbc.user=postgres
 jdbc.password=
 jdbc.driver=org.postgresql.Driver
 PROPS
-java -cp "$LIB/*" it.unibz.inf.ontop.cli.Ontop materialize \
+measure ontop java -cp "$LIB/*" it.unibz.inf.ontop.cli.Ontop materialize \
   -m "$BUILD/mapping.ttl" -p "$BUILD/ontop.properties" -f turtle -o "$BUILD/ontop.tmp.ttl" \
   > "$BUILD/ontop.log" 2>&1 || { tail -20 "$BUILD/ontop.log" >&2; echo "FAIL: Ontop" >&2; exit 1; }
 grep -h "NR of TRIPLES" "$BUILD/ontop.log" || true

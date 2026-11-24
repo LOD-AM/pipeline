@@ -34,11 +34,13 @@ the owner's data decisions and correction rounds in the private LOD-AM/ingest.
 
 `make release` = materialize → enrich → check → publish → package; it runs offline. A failed stage
 or check leaves `out/release/` and `out/internal/` as they were, and an empty result is never
-packaged. A full run takes about 12 minutes, almost all of it SHACL on ~330,000 triples.
+packaged. A full run on ~330,000 triples takes about 40 minutes on the data LXC (2 cores; SHACL alone ~32 min,
+on one core) and about 12 minutes on a faster machine.
 
 **Which publications are released** is decided in the database: `cau.literature.released_on`
-(a date; planning#27). Until that column exists, `config/released-publications.txt` stands in for
-it (currently `hauptmann2002chemical`, already on lod-am.net).
+(a date; planning#27 round 3): set and not in the future = released, a future date schedules the
+release (currently `hauptmann2002chemical`, released on 2026-11-17). The history is in ingest
+`docs/decisions.md`.
 
 **manifest.json** (`out/release/`) traces every file to its inputs: the snapshot (sha256, time),
 the pipeline commit and image, the knowledge-graph commit, the Zotero library version, and per
@@ -57,6 +59,18 @@ GRANT SELECT ON ALL SEQUENCES IN SCHEMA cau TO lodam_pipeline;   -- pg_dump read
 ALTER DEFAULT PRIVILEGES IN SCHEMA cau GRANT SELECT ON TABLES TO lodam_pipeline;
 ALTER DEFAULT PRIVILEGES IN SCHEMA cau GRANT SELECT ON SEQUENCES TO lodam_pipeline;
 ```
+Run the grants **in the research database itself** (pgAdmin: right-click that database → Query
+Tool; `SELECT current_database();` shows where you are). `CREATE ROLE` works from any database, so
+the role shows up even when the grants went elsewhere, and `pg_dump` then fails with
+`permission denied for schema cau`. Check (all three `true`):
+```sql
+SELECT has_schema_privilege('lodam_pipeline', 'cau', 'USAGE'),
+       has_table_privilege('lodam_pipeline', 'cau.site', 'SELECT'),
+       has_table_privilege('lodam_pipeline', 'cau.site', 'UPDATE') = false;
+```
+**After re-importing a dump** that drops and recreates schema `cau` (the correction rounds of
+planning#27), the grants are gone: run the `GRANT` and `ALTER DEFAULT PRIVILEGES` lines again.
+
 Then:
 ```bash
 git clone https://github.com/LOD-AM/pipeline ~/pipeline && cd ~/pipeline
@@ -67,7 +81,17 @@ docker run --rm --network host --user "$(id -u):$(id -g)" --env-file .env -v "$P
 ```
 `RELEASE_STRICT=1` (`-e RELEASE_STRICT=1`) is for scheduled runs. `out/snapshots/` grows by one file
 per changed database; delete old snapshots by hand when they are no longer needed for tracing.
-Scheduling, and handing the release to the triplestore, follow in planning#6 and #7.
+
+**Scheduled runs** (nightly, only when something changed): [`deploy/README.md`](deploy/README.md).
+Handing the release to the triplestore: planning#7.
+
+## Memory
+The checks hold the whole graph in memory (rdflib). Measured with 331,903 triples: SHACL peaks at
+**~1.3 GB** (9 min), the term check, export and package at 0.6–0.8 GB, the throwaway Postgres ~0.2 GB.
+The data LXC needs **3 GB RAM + 1 GB swap** today (with the live Postgres); too little shows as
+`Killed` and exit code 137. Rule of thumb: ~4 GB of SHACL peak per million triples, growing with
+the database, not with the number of released publications. Every release records the peak per
+step in `out/internal/manifest.json` (`resources`), so the trend is visible run by run.
 
 ## Elsewhere (owner's machine, with a dump file)
 ```bash
@@ -77,11 +101,55 @@ make test-pipeline                           # package rules, no database needed
 ```
 or with the image: `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -v /path/to/dump.sql:/dump.sql:ro lod-am-pipeline release DUMP=/dump.sql`.
 
+## Schema rounds of the research database (planning#27)
+The database is restructured in rounds (renames, constraints, explicit semantics, …). Each round is
+a fix script in LOD-AM/ingest plus the matching change of `mapping/` here, and it must give **the same
+graph**, except for the changes the round intends (listed per round in planning#27). How a round
+shows that, with the dump before and after the round:
+```bash
+make release DUMP=../ingest/lod-am.sql KG=../knowledge-graph     # before the round (ingest main)
+make baseline                                 # out/baseline/: full graph + manifest of "before"
+# apply the round's fix script to the dump, change mapping/ to the new names
+make release DUMP=<dump after the round> KG=../knowledge-graph
+make compare                                  # "the same graph" (exit 0), or what changed (exit 1)
+```
+`make compare` (`scripts/compare_graphs.py`) groups removed and added triples by record kind and
+predicate, with examples. Use the same Zotero snapshot (`.cache/zotero`) and `KG_COMMIT` for both
+builds, so that only the round can make a difference. Baseline and report are private like all of
+`out/`: never commit them. A PR gives the canonical sha256 of both graphs and the intended changes,
+with single example triples at most.
+
+## Public CI fixture (`tests/fixture/`)
+Public CI has no data, so it runs a whole release on a **fixture**: the rows of one released
+publication (`hauptmann2002chemical`) and the rows they point to, with that publication's Zotero items
+and the file the server released (`expected.ttl`). `make test-fixture` (in CI inside the image, with
+`--network none`) builds a release from it in a scratch copy and checks that
+1. the release holds only that publication and the manifest,
+2. the released file is the same graph as `expected.ttl`,
+3. the full graph from the fixture has no triple that is not in the released file, so the fixture
+   holds nothing that isn't public already.
+
+A converter change that alters the released file fails 2: update `expected.ttl` in the same PR and
+say which triples change and why. **After a schema round** (planning#27) the fixture's dump no longer
+loads into the new views: rebuild it from the dump after the round, and check 3 again before committing:
+```bash
+make fetch-zotero
+scripts/make_fixture.py ../ingest/lod-am.sql hauptmann2002chemical tests/fixture/hauptmann2002chemical
+cp out/release/published/hauptmann2002chemical.ttl tests/fixture/hauptmann2002chemical/expected.ttl  # from a full run of the same dump
+make test-fixture
+```
+Check 3 compares triples only. Columns the mapping doesn't turn into RDF still travel in the dump, so
+look at the diff of `dump.sql` before committing it. Today these are internal uuids, codes, citation
+strings, `released_on` and a feature's name as recorded.
+
 ## Files
-- `Makefile`, `scripts/stages/`: the stages; `scripts/`: Zotero, literature, source-row test, publication export
+- `scripts/compare_graphs.py`: two full graphs, same or what changed (schema rounds, planning#27)
+- `Makefile`, `scripts/stages/`: the stages (`measure.py` records memory and time, `changed.py` decides whether
+  a scheduled run needs a release); `scripts/`: Zotero, literature, source-row test, publication export
+- `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`)
 - `mapping/`: SQL views + R2RML ([`mapping/README.md`](mapping/README.md)), `pom.xml` (Ontop)
-- `config/released-publications.txt`: stand-in for the database's release flag
 - `Dockerfile`, `docker/`: the build image ([`docker/README.md`](docker/README.md))
+- `tests/fixture/`, `scripts/make_fixture.py`, `scripts/test_fixture.sh`: the public CI fixture (above)
 - `.github/workflows/ci.yml`: tests and image build, **without data** (the database never reaches GitHub)
 
 ## Licence

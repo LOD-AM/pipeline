@@ -16,7 +16,7 @@ PY ?= python3
 ONTOP_LIB ?= $(CURDIR)/.cache/ontop/$(shell sha256sum mapping/pom.xml | cut -c1-16)
 export KG ONTOP_LIB
 
-.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot materialize enrich check publish package test-pipeline clean
+.PHONY: release fetch fetch-zotero fetch-ontop fetch-kg snapshot changed materialize enrich check publish package baseline compare test-pipeline test-deploy test-fixture clean
 
 release: materialize enrich check publish package
 
@@ -35,6 +35,9 @@ fetch-kg:            ## ontologies the knowledge-graph checks need → $(KG)/.ca
 snapshot:            ## live research database (read-only) → out/snapshots/<time>.sql, latest.sql
 	bash scripts/stages/snapshot.sh
 
+changed:             ## inputs changed since the live release? → out/run-decision.txt (deploy/run.sh)
+	$(PY) scripts/stages/changed.py
+
 materialize:         ## dump → Postgres → views → R2RML → Ontop (out/.build/ontop.ttl, skip report)
 	bash scripts/stages/materialize.sh $(DUMP)
 
@@ -50,8 +53,28 @@ publish:             ## one checked file per released publication (out/.build/pu
 package:             ## → out/release/ + out/internal/ (previous: *.prev/)
 	$(PY) scripts/stages/package.py
 
+# Schema rounds of the research database (planning#27): every round must give the same graph except
+# for its intended changes. `make baseline` keeps the current full graph; after the round's release,
+# `make compare` lists what changed. Both stay in out/ (private, never committed).
+BASELINE ?= out/baseline
+baseline:            ## keep out/internal/ (full graph + manifest) as $(BASELINE)/ for `make compare`
+	@test -f out/internal/lod-am.ttl || { echo "FAIL: no out/internal/lod-am.ttl; run make release first"; exit 1; }
+	rm -rf $(BASELINE) && mkdir -p $(BASELINE) && cp out/internal/lod-am.ttl out/internal/manifest.json $(BASELINE)/
+	@$(PY) -c "import json,sys; g=json.load(open(sys.argv[1]))['graph']; print('baseline:', g['triples'], 'triples, canonical sha256', g['canonical_sha256'])" $(BASELINE)/manifest.json
+
+compare:             ## $(BASELINE)/lod-am.ttl vs. out/internal/lod-am.ttl: same graph, or what changed (exit 1)
+	$(PY) scripts/compare_graphs.py $(BASELINE)/lod-am.ttl out/internal/lod-am.ttl
+
 test-pipeline:       ## package/publish rules: a failed check never replaces a release (no database)
 	bash scripts/stages/test_pipeline.sh
+	bash scripts/test_compare_graphs.sh
+
+test-fixture:        ## a whole release on the public fixture tests/fixture/ (no private data; CI, in the image)
+	bash scripts/test_fixture.sh
+
+test-deploy:         ## deploy/run.sh control flow with stubbed docker and curl (no server needed)
+	bash deploy/test_deploy.sh
+	bash deploy/test_alert.sh
 
 clean:               ## remove the scratch directory (never a release or a snapshot)
 	rm -rf out/.build

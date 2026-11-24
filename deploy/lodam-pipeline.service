@@ -1,0 +1,19 @@
+# Scheduled LOD-AM pipeline run on the data LXC (planning#6). Installed by deploy/install.sh,
+# which fills in @DIR@ (the pipeline checkout). Logs: journalctl -u lodam-pipeline
+[Unit]
+Description=LOD-AM data pipeline: database snapshot and checked release (planning#6)
+Documentation=https://github.com/LOD-AM/pipeline/blob/main/deploy/README.md
+Requires=docker.service
+After=docker.service network-online.target postgresql.service
+Wants=network-online.target
+# A failed run mails the owner (deploy/alert.sh, planning#34)
+OnFailure=lodam-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=@DIR@/deploy/run.sh
+# A run takes ~40 minutes on the data LXC today (SHACL ~32 min); room to grow (README "Memory")
+TimeoutStartSec=3h
+# Leave the CPU and disk to interactive work (pgAdmin, Postgres) while it runs
+Nice=10
+IOSchedulingClass=idle
