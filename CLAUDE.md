@@ -67,8 +67,11 @@ the graph: say which triples change and why in the PR.
   flag `cau.literature.released_on` is the only release switch; `analysed_element`, codes, reference tables; analysis
   remarks as `P3_has_note`, full graph `4289f5d3…`), site point as `site.geometry` (5). A view change lands together
   with the owner's run of the round's SQL (the nightly run pulls `main`).
-- Next: round 4 (reported ids only, after the owner's review); after each round, rebuild `tests/fixture/`
-  (README "Public CI fixture"). Since 2026-11-23 CI runs a whole release on that fixture (planning#36).
+- Round 4 (reported numbers only, 2026-11-25, on ingest's twenty-fifth dump): the views publish only
+  `find_no_reported` / `analysis_no_reported`; `-` (the publication gives none) = no identifier, label without a
+  number (`lodam_rdf.reported`); no internal id reaches the RDF. Full graph `9dce1017…` (the owner's corrections in
+  the same dump: `3205a088…` with the old views). Fixture rebuilt. All rounds of planning#27 done once it is deployed.
+  Since 2026-11-23 CI runs a whole release on the fixture (planning#36); rebuild it after every schema round.
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.

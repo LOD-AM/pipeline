@@ -204,8 +204,9 @@ same("finds at the site's place (P53)", {(URIRef(f"{BASE}find/{u}"), URIRef(f"{B
      {(a, b) for a, b in g.subject_objects(CRM.P53_has_former_or_current_location) if a in finds})
 OLD, DRAW = URIRef(BASE + "old_identifier"), URIRef(BASE + "drawing_number")
 for u, old, drawing, note in [r + [""] * (4 - len(r)) for r in sql(
-        "SELECT x.id_uuid, coalesce(nullif(btrim(x.find_no_reported), ''), ''), "
-        "CASE WHEN nullif(btrim(x.drawing_no_reported), '') NOT IN (coalesce(nullif(btrim(x.find_no_reported), ''), ''), x.find_id::text) THEN btrim(x.drawing_no_reported) ELSE '' END, "
+        # reported numbers only; "-" = the publication gives none (owner, planning#27 round 4)
+        "SELECT x.id_uuid, coalesce(nullif(nullif(btrim(x.find_no_reported), ''), '-'), ''), "
+        "CASE WHEN nullif(btrim(x.drawing_no_reported), '') <> coalesce(nullif(btrim(x.find_no_reported), ''), '') THEN btrim(x.drawing_no_reported) ELSE '' END, "
         "coalesce(nullif(btrim(x.remarks), ''), '') FROM cau.find x")]:
     f = URIRef(f"{BASE}find/{u}")
     ids = {(g.value(i, CRM.P2_has_type), str(g.value(i, CRM.P190_has_symbolic_content))) for i in g.objects(f, CRM.P1_is_identified_by)}
@@ -228,6 +229,12 @@ same("remarks of analyses as notes (P3, owner 2026-11-22)", {(URIRef(f"{BASE}ana
      "SELECT id_uuid, btrim(remarks) FROM cau.chemical_analysis WHERE btrim(coalesce(remarks, '')) <> '' "
      "UNION ALL SELECT id_uuid, btrim(remarks) FROM cau.lead_isotope_analysis WHERE btrim(coalesce(remarks, '')) <> ''")},
      {(a, n) for a, n in g.subject_objects(CRM.P3_has_note) if str(a).startswith(BASE + "analysis/")})
+# identifier = the reported number only, none for "-"; never the internal id (owner, planning#27 round 4)
+DCT = Namespace("http://purl.org/dc/terms/")
+same("analysis identifiers (dcterms:identifier = analysis_no_reported, none for \"-\")", {(URIRef(f"{BASE}analysis/{u}"), Literal(n)) for u, n in sql(
+     "SELECT id_uuid, btrim(analysis_no_reported) FROM cau.chemical_analysis WHERE nullif(nullif(btrim(analysis_no_reported), ''), '-') IS NOT NULL "
+     "UNION ALL SELECT id_uuid, btrim(analysis_no_reported) FROM cau.lead_isotope_analysis WHERE nullif(nullif(btrim(analysis_no_reported), ''), '-') IS NOT NULL")},
+     {(a, n) for a, n in g.subject_objects(DCT.identifier) if str(a).startswith(BASE + "analysis/")})
 same("samples (S13), one per analysis", {URIRef(f"{a}/sample") for a in analyses}, set(g.subjects(RDF.type, CRMS.S13_Sample)))
 same("analysis → sample (has input)", {(a, URIRef(f"{a}/sample")) for a in analyses}, set(g.subject_objects(AFX.AFX_0000399)))
 same("analysis → lab", {(URIRef(f"{BASE}analysis/{a}"), URIRef(f"{BASE}lab/{l}")) for a, l in sql(
