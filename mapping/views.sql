@@ -13,6 +13,10 @@ CREATE FUNCTION iri(kind text, u uuid) RETURNS text IMMUTABLE LANGUAGE sql
 -- Trimmed text, NULL when empty.
 CREATE FUNCTION clean(t text) RETURNS text IMMUTABLE LANGUAGE sql
     AS $$ SELECT nullif(btrim(t), '') $$;
+-- A number reported in the publication (find_no_reported, analysis_no_reported), NULL for "-": the
+-- publication gives none (owner, 2026-11-25; planning#27 round 4). Internal ids are never published.
+CREATE FUNCTION reported(t text) RETURNS text IMMUTABLE LANGUAGE sql
+    AS $$ SELECT nullif(lodam_rdf.clean(t), '-') $$;   -- qualified: the body is resolved at run time (Ontop's search_path)
 
 -- Sites, places, geometry ----------------------------------------------------
 -- Label: site_latin @en (official name in Latin script); site_native with its own
@@ -147,9 +151,10 @@ LEFT JOIN cau.type_group g ON g.type_group_id = t.type_group_id
 JOIN cau.find_class fc ON fc.find_class_id = t.find_class_id;
 
 -- Finds (ingest#10, ingest#13, ingest#19, knowledge-graph#28) ---------------------------------------------
--- Label: "<Type> (no. <find_no_reported>, <site>)", or "<Type> (<site>)" without an old identifier.
--- find_no_reported is an old identifier, only where present (owner, ingest#34). drawing_no_reported = drawing
--- number in the publication, dropped when it repeats find_no_reported or find_id (ingest#13). AAT only via the type's match.
+-- Label: "<Type> (no. <find_no_reported>, <site>)", or "<Type> (<site>)" when the publication gives no number
+-- (find_no_reported "-"; owner, planning#27 round 4). find_no_reported is the identifier the source records (ingest#34);
+-- find_id is internal and never published. drawing_no_reported = drawing number in the publication, dropped
+-- when it repeats find_no_reported (ingest#13). AAT only via the type's match.
 -- Context: the feature (AP21i) or, without a feature, the site's place (P53, knowledge-graph#19).
 CREATE VIEW find AS
 SELECT iri('find', x.id_uuid) AS find_iri,
@@ -173,9 +178,8 @@ JOIN cau.site s USING (site_id)
 JOIN cau.type t USING (type_id)
 LEFT JOIN cau.feature f ON f.site_id = x.site_id AND f.feature_id = x.feature_id
 LEFT JOIN cau.material m ON m.material_id = x.material_id
-CROSS JOIN LATERAL (SELECT clean(x.find_no_reported) AS old,
-       CASE WHEN clean(x.drawing_no_reported) IS NOT NULL AND clean(x.drawing_no_reported) <> coalesce(clean(x.find_no_reported), '') AND clean(x.drawing_no_reported) <> x.find_id::text
-            THEN clean(x.drawing_no_reported) END AS drawing) n
+CROSS JOIN LATERAL (SELECT reported(x.find_no_reported) AS old,
+       CASE WHEN clean(x.drawing_no_reported) IS DISTINCT FROM clean(x.find_no_reported) THEN clean(x.drawing_no_reported) END AS drawing) n
 WHERE clean(s.site_latin) IS NOT NULL;
 
 -- Labs (ingest#5) with their ROR id (CONVENTIONS "Analytics": E74_Group, owl:sameAs ROR) ----------------------------
@@ -203,8 +207,10 @@ WHERE p.code IS DISTINCT FROM 'whole_object';
 
 -- Analyses: one sampling, one sample and one analysis per chemical_analysis / lead_isotope_analysis row (repeat analyses are separate
 -- samples, ingest#5). Method from cau.analysis_method (AFO class; chemical: assay, method mostly unknown;
--- lead isotopes: mass spectrometry, ingest#5). Identifier: analysis_no_reported (original lab number) or
--- the id (ingest#13). Remarks are a public note on the analysis (owner, 2026-11-22; planning#27).
+-- lead isotopes: mass spectrometry, ingest#5). Identifier: analysis_no_reported (original lab number, ingest#13);
+-- for "-" (the publication gives none) no identifier and labels without a number. The internal
+-- chemical_analysis_id / lead_isotope_analysis_id are never published (owner, planning#27 round 4).
+-- Remarks are a public note on the analysis (owner, 2026-11-22; planning#27).
 CREATE VIEW analysis AS
 SELECT iri('analysis', a.id_uuid) AS analysis_iri,
        iri('analysis', a.id_uuid) || '/sampling' AS sampling_iri,
@@ -212,20 +218,21 @@ SELECT iri('analysis', a.id_uuid) AS analysis_iri,
        CASE WHEN p.code = 'whole_object' THEN fv.find_iri ELSE fv.find_iri || '/' || lower(replace(p.part_en, ' ', '_')) END AS sampled_iri,
        a.kind,
        'http://purl.allotrope.org/ontologies/process#' || am.afo_id AS method_iri,
-       coalesce(clean(a.ref), a.id::text) AS identifier,
-       CASE a.kind WHEN 'ca' THEN 'Chemical analysis ' ELSE 'Lead isotope analysis ' END || coalesce(clean(a.ref), a.id::text) || ' of ' || fv.label_en AS label_en,
-       CASE a.kind WHEN 'ca' THEN 'Chemische Analyse ' ELSE 'Bleiisotopenanalyse ' END || coalesce(clean(a.ref), a.id::text) || ' von ' || fv.label_de AS label_de,
+       r.no AS identifier,
+       CASE a.kind WHEN 'ca' THEN 'Chemical analysis ' ELSE 'Lead isotope analysis ' END || coalesce(r.no || ' ', '') || 'of ' || fv.label_en AS label_en,
+       CASE a.kind WHEN 'ca' THEN 'Chemische Analyse ' ELSE 'Bleiisotopenanalyse ' END || coalesce(r.no || ' ', '') || 'von ' || fv.label_de AS label_de,
        'Sample from ' || fv.label_en || CASE WHEN p.code = 'whole_object' THEN '' ELSE ', ' || p.part_en END
-           || ' (' || coalesce(clean(a.ref), a.id::text) || ')' AS sample_label_en,
+           || coalesce(' (' || r.no || ')', '') AS sample_label_en,
        'Probe von ' || fv.label_de || CASE WHEN p.code = 'whole_object' THEN '' ELSE ', ' || p.part_de END
-           || ' (' || coalesce(clean(a.ref), a.id::text) || ')' AS sample_label_de,
+           || coalesce(' (' || r.no || ')', '') AS sample_label_de,
        CASE WHEN l.id_uuid IS NOT NULL THEN iri('lab', l.id_uuid) END AS lab_iri,
        clean(a.remarks) AS note,
        pub.publication_iri
-FROM (SELECT 'ca' AS kind, chemical_analysis_id AS id, site_id, find_id, part_id, lab_id, analysis_no_reported AS ref, literature_id, id_uuid,
+FROM (SELECT 'ca' AS kind, site_id, find_id, part_id, lab_id, analysis_no_reported AS ref, literature_id, id_uuid,
              analysis_method_id, remarks FROM cau.chemical_analysis
-      UNION ALL SELECT 'pb', lead_isotope_analysis_id, site_id, find_id, part_id, lab_id, analysis_no_reported, literature_id, id_uuid,
+      UNION ALL SELECT 'pb', site_id, find_id, part_id, lab_id, analysis_no_reported, literature_id, id_uuid,
              analysis_method_id, remarks FROM cau.lead_isotope_analysis) a
+CROSS JOIN LATERAL (SELECT reported(a.ref) AS no) r
 JOIN cau.analysis_method am USING (analysis_method_id)
 LEFT JOIN cau.literature lit ON lit.literature_id = a.literature_id
 LEFT JOIN lodam_lit.publication pub ON pub.zotero_key = lit.zotero_key
