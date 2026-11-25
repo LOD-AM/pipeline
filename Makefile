@@ -68,6 +68,7 @@ compare:             ## $(BASELINE)/lod-am.ttl vs. out/internal/lod-am.ttl: same
 test-pipeline:       ## package/publish rules: a failed check never replaces a release (no database)
 	bash scripts/stages/test_pipeline.sh
 	bash scripts/test_compare_graphs.sh
+	bash scripts/test_export_publication.sh
 
 test-fixture:        ## a whole release on the public fixture tests/fixture/ (no private data; CI, in the image)
 	bash scripts/test_fixture.sh
