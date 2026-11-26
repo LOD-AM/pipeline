@@ -34,6 +34,10 @@ updates:
     schedule:
       interval: weekly
     labels: ["dependency-updates"]
+    ignore:
+      # Jena 6 is compiled for Java 21; the image has Java 17 (Ontop, see eclipse-temurin above)
+      - dependency-name: "org.apache.jena:*"
+        versions: [">= 6"]
   - package-ecosystem: docker-compose  # deploy/database/docker-compose.yml (the research database's stack)
     directory: "/deploy/database"
     schedule:
