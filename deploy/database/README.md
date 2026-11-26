@@ -46,14 +46,15 @@ so going back is always possible.
 5. **PostGIS and checks** in the research database:
    ```bash
    docker compose exec db psql -U <user> -d <database> -c "ALTER EXTENSION postgis UPDATE" -c "SELECT version(), postgis_full_version()"
-   psql -h 127.0.0.1 -U lodam_pipeline -d <database> -c "SELECT count(*) FROM cau.site"   # the pipeline's login: 504
+   psql -h 127.0.0.1 -U lodam_pipeline -d <database> -c "SELECT count(*) FROM cau.site"   # the pipeline's login; same count as on the old server
    ```
    Then the grants check from the pipeline README ("On the data LXC", three times `true`).
 6. **The rest:** `docker compose up -d`. In pgAdmin, add the server again (host `db`); run
    `cau_help` (ingest `scripts/database/fixes/2026-11-22_28_helper_views.sql`) again if it is missing.
 7. **The proof:** `sudo systemctl start lodam-pipeline`. The snapshot counts as new (the server
-   version is in the dump), but the full graph must stay `9dce1017…` (343,366 triples) with today's
-   data. The release then differs only in its manifest, which records the server version.
+   version is in the dump), but the full graph's `canonical_sha256` (`out/internal/manifest.json`) must
+   be the same as after the last run on the old server. The release then differs only in its
+   manifest, which records the server version.
 
 **Rollback:** in `~/database-stack`, `docker compose down`; in the old folder, `docker compose up -d`.
 After a week without problems, remove the old volumes (`docker volume ls`).
