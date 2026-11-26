@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Scheduled pipeline run on the data LXC (planning#6), started by lodam-pipeline.service (as root,
 # for Docker). Every file in the checkout is written as the checkout's owner, never as root.
-#   1. code:   fast-forward the checkout to origin/main (only the owner merges there); refuse
+#   1. code:   fast-forward the checkout to origin/main (only the owner merges there; main is
+#              protected), but only to a commit whose check runs on GitHub passed; refuse
 #              local changes, so that a release always matches a commit
 #   2. image:  rebuild lod-am-pipeline only when Dockerfile, docker/ or mapping/pom.xml changed
 #   3. fetch snapshot changed: Zotero, the live database (read-only role, PG* from .env), and
@@ -31,6 +32,20 @@ as_owner() {
 }
 # Values from .env without executing it (it holds the database password)
 envval() { grep -E "^$1=" .env 2>/dev/null | tail -1 | cut -d= -f2- || true; }
+# The check runs of a commit on GitHub: "passed N", "failed N", "running", "none" or "unreadable".
+# Read with grep (no python3 or jq on the host): every check run has exactly one "status" and one
+# "conclusion"; nothing else in the response has these keys.
+checks_of() {
+  local json n open bad
+  json=$(curl -sS --fail --max-time 30 -H "Accept: application/vnd.github+json" \
+    "${LODAM_GITHUB_API:-https://api.github.com}/repos/${LODAM_PIPELINE_REPO:-LOD-AM/pipeline}/commits/$1/check-runs?per_page=100") \
+    || { echo unreadable; return 0; }
+  n=$(grep -o '"status": *"[a-z_]*"' <<< "$json" | wc -l || true)
+  open=$(grep -o '"status": *"[a-z_]*"' <<< "$json" | grep -vc '"completed"' || true)
+  bad=$(grep -oE '"conclusion": *("[a-z_]*"|null)' <<< "$json" | grep -vcE '"(success|neutral|skipped)"' || true)
+  if [ "$n" = 0 ]; then echo none; elif [ "$open" != 0 ]; then echo running
+  elif [ "$bad" != 0 ]; then echo "failed $bad"; else echo "passed $n"; fi
+}
 
 exec 9> "${LODAM_LOCK:-/run/lodam-pipeline.lock}"
 flock -n 9 || { log "another run is still in progress; nothing to do"; exit 0; }
@@ -41,7 +56,17 @@ flock -n 9 || { log "another run is still in progress; nothing to do"; exit 0; }
 [ -z "$(as_owner git status --porcelain --untracked-files=no)" ] \
   || { log "FAIL: checkout has local changes; commit or discard them first"; exit 1; }
 as_owner git fetch -q origin main
-as_owner git merge -q --ff-only origin/main
+# New code only once its checks on GitHub passed (planning review 2026-11-25, 5.2; the same gate as
+# the triplestore's update_kg.sh). Failed checks: the run stops and the owner gets the failure mail.
+# Checks not finished, none yet, or GitHub not readable: tonight's run uses the code it already has.
+cur=$(as_owner git rev-parse HEAD); new=$(as_owner git rev-parse origin/main)
+if [ "$new" != "$cur" ]; then
+  case $(checks_of "$new") in
+    passed*) as_owner git merge -q --ff-only origin/main ;;
+    failed*) log "FAIL: main ${new:0:7} is not used, its checks on GitHub failed; the code stays at ${cur:0:7}"; exit 1 ;;
+    *) log "main ${new:0:7}: checks on GitHub not finished or not readable; this run uses ${cur:0:7}" ;;
+  esac
+fi
 log "code at $(as_owner git rev-parse --short HEAD)"
 
 # 2. image
