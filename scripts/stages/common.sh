@@ -11,6 +11,7 @@ WORK=$(realpath "${WORKDIR:-/tmp}")/lodam-rdf-pg
 PORT=${LODAM_PG_PORT:-5498}   # scripts/test_fixture.sh uses another, so a test never meets a real run
 DB=lodam_rdf
 LIB=${ONTOP_LIB:-$ROOT/.cache/ontop/$(sha256sum mapping/pom.xml | cut -c1-16)}   # as in Makefile; the image sets ONTOP_LIB
+export KG JENA_LIB=${JENA_LIB:-$ROOT/.cache/jena/$(sha256sum shacl/pom.xml | cut -c1-16)}   # for scripts/shacl.py; the same
 BUILD=$ROOT/out/.build      # scratch: stages pass their results here; nothing here is a release
 SNAP=$ROOT/out/snapshots    # database snapshots (private, stay on the server)
 PSQL="psql -h $WORK -p $PORT -U postgres -v ON_ERROR_STOP=1 -q"

@@ -14,6 +14,8 @@
 #  10. a new commit on origin/main whose checks failed: not used, non-zero exit, nothing runs
 #  11. checks still running, or GitHub not readable: tonight's run uses the code it has
 #  12. the checks' answer is read in GitHub's compact form too
+#  13. containers left by an earlier, interrupted run (label net.lod-am.run=pipeline) are removed first
+#  14. a run stopped with TERM removes its own container and exits non-zero at once
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SRC=$PWD
@@ -22,9 +24,9 @@ mkdir -p "$T/bin"
 git init -q --bare -b main "$T/origin.git"
 git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 W=$T/work
-mkdir -p "$W/deploy" "$W/docker" "$W/mapping"
+mkdir -p "$W/deploy" "$W/docker" "$W/mapping" "$W/shacl"
 cp "$SRC/deploy/run.sh" "$W/deploy/"; cp "$SRC/Dockerfile" "$SRC/.dockerignore" "$W/"
-cp "$SRC/docker/"* "$W/docker/"; cp "$SRC/mapping/pom.xml" "$W/mapping/"
+cp "$SRC/docker/"* "$W/docker/"; cp "$SRC/mapping/pom.xml" "$W/mapping/"; cp "$SRC/shacl/pom.xml" "$W/shacl/"
 printf '%s\n' 'out/' '.env' > "$W/.gitignore"
 git -C "$W" add -A; git -C "$W" -c user.name=t -c user.email=t@example.invalid commit -qm init; git -C "$W" -c push.negotiate=false push -q origin main
 printf '%s\n' 'PGHOST=127.0.0.1' 'PGDATABASE=change-me' 'PGPASSWORD=change-me' \
@@ -35,6 +37,7 @@ cat > "$T/bin/docker" <<'EOF'
 # stub: records calls; simulates image labels, the decision and the release
 echo "docker $*" >> "$T/docker.log"
 case $1 in
+  ps) printf '%s\n' ${LEFTOVERS:-}; exit 0 ;;
   image) cat "$T/label" 2>/dev/null; exit 0 ;;
   build) for a in "$@"; do [[ $a == net.lod-am.inputs=* ]] && echo "${a#*=}" > "$T/label"; done; exit 0 ;;
   run)
@@ -43,6 +46,7 @@ case $1 in
     if [[ $args == *" changed "* ]]; then mkdir -p out; echo "$DECISION" > out/run-decision.txt; fi
     if [[ $args == *" release "* ]]; then
       [ "${FAIL_RELEASE:-}" = 1 ] && exit 2
+      [ "${SLOW_RELEASE:-}" = 1 ] && { echo $$ > "$T/release.pid"; sleep 30; }
       mkdir -p out/release out/internal; echo "{\"run\": \"$RANDOM\"}" > out/release/manifest.json
       echo '{"resources": {"peak_rss_mb": 1300, "peak_step": "shacl", "seconds": 700}}' > out/internal/manifest.json
     fi ;;
@@ -90,7 +94,8 @@ fail() { echo "FAIL $1"; cat "$T/out.log"; exit 1; }
 reset; DECISION="changed: no release yet" run || fail "1: run failed"
 [ "$(calls 'docker build' docker.log)" = 1 ] && [ "$(calls ' release$' docker.log)" = 1 ] && [ "$(calls 'manifest_sha256' curl.log)" = 1 ] \
   || fail "1: expected one build, one release, one signal"
-grep -q 'docker run --rm --network none .* release$' "$T/docker.log" || fail "1: release container is not offline"
+grep -q 'docker run --rm --name lodam-pipeline-release --label net.lod-am.run=pipeline --network none .* release$' "$T/docker.log" \
+  || fail "1: release container is not offline, or has no fixed name and label"
 echo "ok   1 first run: image built, offline release, webhook signalled"
 
 reset; DECISION="unchanged: snapshot abc, pipeline def" run || fail "2: run failed"
@@ -165,3 +170,19 @@ tr -d ' \n' < "$T/checks-passed.json" > "$T/checks-compact.json"
 reset; CHECKS="$T/checks-compact.json" DECISION="unchanged: x" run || fail "12: run failed"
 [ "$(here)" = "$(git -C "$T/other" rev-parse HEAD)" ] || fail "12: compact JSON with passed checks: main not fast-forwarded"
 echo "ok  12 GitHub's compact JSON: passed checks, main fast-forwarded"
+
+# 13.-14. no containers left behind (planning review 2026-11-25; two ran for days until 2026-11-26)
+reset; LEFTOVERS="abc123 def456" DECISION="unchanged: x" run || fail "13: run failed"
+grep -q "docker ps -aq --filter label=net.lod-am.run=pipeline" "$T/docker.log" && grep -q "docker rm -f abc123 def456" "$T/docker.log" \
+  && grep -q "removing 2 container(s) left by an earlier" "$T/out.log" || fail "13: leftover containers not removed"
+echo "ok  13 leftover containers of an interrupted run are removed first"
+
+reset; rm -f "$T/release.pid"
+(cd "$W" && SLOW_RELEASE=1 DECISION="changed: x" exec bash deploy/run.sh) > "$T/out.log" 2>&1 & runpid=$!
+for _ in $(seq 50); do [ -s "$T/release.pid" ] && break; sleep 0.1; done
+[ -s "$T/release.pid" ] || fail "14: the release never started"
+kill -TERM "$runpid"; start=$SECONDS; rc=0; wait "$runpid" || rc=$?
+kill "$(cat "$T/release.pid")" 2>/dev/null || true
+[ "$rc" != 0 ] && [ $((SECONDS - start)) -lt 10 ] && grep -q "docker rm -f lodam-pipeline-release" "$T/docker.log" \
+  && [ "$(calls 'manifest_sha256' curl.log)" = 0 ] || fail "14: TERM did not remove the release container, or the run went on (rc $rc)"
+echo "ok  14 TERM during the release: its container is removed, non-zero exit, no signal"

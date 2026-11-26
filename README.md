@@ -28,7 +28,7 @@ the owner's data decisions and correction rounds in the private LOD-AM/ingest.
 | `snapshot` | the database | live database, schema `cau` → `out/snapshots/<UTC time>.sql` + `.json` (sha256, time, server version), `latest.sql` points to it; an unchanged database is not stored twice |
 | `materialize` | nothing | snapshot (or `DUMP=<file>`) → throwaway PostgreSQL 16 + PostGIS (127.0.0.1:5498) → `mapping/views.sql` → R2RML → Ontop → `out/.build/ontop.ttl`, skip report |
 | `enrich` | nothing | + FaBiO records of the cited literature from the Zotero snapshot → `out/.build/lod-am.ttl` |
-| `check` | nothing | knowledge-graph `tools/check_terms.py` + `tools/validate.py` (SHACL), `scripts/test_materialize.py` → `checks.json` only if all pass |
+| `check` | nothing | knowledge-graph `tools/check_terms.py`, SHACL with knowledge-graph's shapes (Jena, `scripts/shacl.py`), `scripts/test_materialize.py` → `checks.json` only if all pass |
 | `publish` | nothing | each released publication: `scripts/export_publication.py` (one parse of the full graph for all of them) (its finds and analyses and what they point to, with a privacy guard), checked again → `out/.build/published/` |
 | `package` | nothing | → `out/release/` and `out/internal/`, each swapped in with one rename; the previous ones stay as `*.prev/` |
 
