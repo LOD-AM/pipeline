@@ -29,6 +29,11 @@ updates:
     schedule:
       interval: weekly
     labels: ["dependency-updates"]
+  - package-ecosystem: maven           # shacl/pom.xml (Apache Jena command-line tools: SHACL)
+    directory: "/shacl"
+    schedule:
+      interval: weekly
+    labels: ["dependency-updates"]
   - package-ecosystem: docker-compose  # deploy/database/docker-compose.yml (the research database's stack)
     directory: "/deploy/database"
     schedule:

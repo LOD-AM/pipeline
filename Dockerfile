@@ -8,16 +8,20 @@
 #     lod-am-pipeline fetch snapshot release                     # on the data LXC (README.md)
 #
 # Every input is pinned: base images by digest (Dependabot), Python by lock file with hashes,
-# Ontop + JDBC by mapping/pom.xml, knowledge-graph by commit. A knowledge-graph bump is a
+# Ontop + JDBC by mapping/pom.xml, Jena by shacl/pom.xml, knowledge-graph by commit. A knowledge-graph bump is a
 # deliberate change (new shapes can reject data): change KG_COMMIT in its own PR.
 
-# Ontop CLI + PostgreSQL JDBC driver, at the versions in mapping/pom.xml
+# Ontop CLI + PostgreSQL JDBC driver, at the versions in mapping/pom.xml, and Apache Jena's
+# command-line tools (SHACL validation) at the version in shacl/pom.xml, in separate directories
 FROM maven:3.9.16-eclipse-temurin-17@sha256:1a352420f7aba21f5ad08df31bab55f74c013fb491f1ae8ab1dd7ff9ed698584 AS ontop
 COPY mapping/pom.xml /build/pom.xml
 RUN mvn -q -f /build/pom.xml dependency:copy-dependencies -DoutputDirectory=/opt/ontop/lib \
  && ls /opt/ontop/lib/ontop-cli-*.jar /opt/ontop/lib/postgresql-*.jar
+COPY shacl/pom.xml /build/shacl/pom.xml
+RUN mvn -q -f /build/shacl/pom.xml dependency:copy-dependencies -DoutputDirectory=/opt/jena/lib \
+ && ls /opt/jena/lib/jena-shacl-*.jar /opt/jena/lib/slf4j-nop-*.jar
 
-# Java runtime for Ontop
+# Java runtime for Ontop and Jena
 FROM eclipse-temurin:17.0.21_9-jre@sha256:fb2cec8da84e3f086b59e29bf432d372e396fe0c247adcfb89303a28c2e313c0 AS jre
 
 # PostgreSQL 16 + PostGIS 3.6 (Debian trixie); materialize loads the dump into a throwaway cluster.
@@ -32,6 +36,7 @@ RUN apt-get update \
 
 COPY --from=jre /opt/java/openjdk /opt/java/openjdk
 COPY --from=ontop /opt/ontop/lib /opt/ontop/lib
+COPY --from=ontop /opt/jena/lib /opt/jena/lib
 
 COPY docker/requirements.txt /opt/requirements.txt
 RUN python3 -m venv /opt/venv \
@@ -55,6 +60,7 @@ ENV PATH=/opt/venv/bin:/opt/java/openjdk/bin:/usr/lib/postgresql/16/bin:$PATH \
     JAVA_HOME=/opt/java/openjdk \
     KG=/opt/knowledge-graph \
     ONTOP_LIB=/opt/ontop/lib \
+    JENA_LIB=/opt/jena/lib \
     PG_BIN=/usr/lib/postgresql/16/bin \
     WORKDIR=/tmp
 ARG PIPELINE_IMAGE=lod-am-pipeline:local

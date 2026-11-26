@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fetches Apache Jena's command-line tools (SHACL validation, riot) from Maven Central into
+     .cache/jena/<hash of this file> (gitignored; `make fetch`) or, in the build image, /opt/jena/lib.
+     Not a build. Used by scripts/shacl.py for the SHACL checks of the check and publish stages:
+     the same results as pySHACL, ~50 times faster and in a fraction of the memory (planning review
+     2026-11-25, section 6). The version follows the triplestore's Fuseki. Kept apart from
+     mapping/pom.xml, so that Jena's jars never meet Ontop's on one classpath. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>net.lod-am</groupId>
+  <artifactId>pipeline-jena</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-cmds</artifactId>
+      <version>6.2.0</version>
+    </dependency>
+    <!-- Jena logs through SLF4J; without a provider it prints three warnings per run -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <version>2.0.18</version>
+    </dependency>
+  </dependencies>
+</project>

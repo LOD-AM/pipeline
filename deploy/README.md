@@ -11,7 +11,7 @@
      has, and the next run tries again.
 
    A checkout with local changes or off `main` is refused, so that every release matches a commit.
-2. **Image:** rebuild `lod-am-pipeline` only when `Dockerfile`, `docker/` or `mapping/pom.xml`
+2. **Image:** rebuild `lod-am-pipeline` only when `Dockerfile`, `docker/`, `mapping/pom.xml` or `shacl/pom.xml`
    changed (an image label records which inputs it was built from).
 3. **`fetch snapshot changed`:** Zotero, a snapshot of the live database (read-only role, the `PG*`
    lines of `.env`, and nothing else from `.env`), then the decision: has anything changed since the

@@ -24,9 +24,9 @@ mkdir -p "$T/bin"
 git init -q --bare -b main "$T/origin.git"
 git clone -q "$T/origin.git" "$T/work" 2>/dev/null
 W=$T/work
-mkdir -p "$W/deploy" "$W/docker" "$W/mapping"
+mkdir -p "$W/deploy" "$W/docker" "$W/mapping" "$W/shacl"
 cp "$SRC/deploy/run.sh" "$W/deploy/"; cp "$SRC/Dockerfile" "$SRC/.dockerignore" "$W/"
-cp "$SRC/docker/"* "$W/docker/"; cp "$SRC/mapping/pom.xml" "$W/mapping/"
+cp "$SRC/docker/"* "$W/docker/"; cp "$SRC/mapping/pom.xml" "$W/mapping/"; cp "$SRC/shacl/pom.xml" "$W/shacl/"
 printf '%s\n' 'out/' '.env' > "$W/.gitignore"
 git -C "$W" add -A; git -C "$W" -c user.name=t -c user.email=t@example.invalid commit -qm init; git -C "$W" -c push.negotiate=false push -q origin main
 printf '%s\n' 'PGHOST=127.0.0.1' 'PGDATABASE=change-me' 'PGPASSWORD=change-me' \

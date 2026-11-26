@@ -4,7 +4,7 @@
 #   1. code:   fast-forward the checkout to origin/main (only the owner merges there; main is
 #              protected), but only to a commit whose check runs on GitHub passed; refuse
 #              local changes, so that a release always matches a commit
-#   2. image:  rebuild lod-am-pipeline only when Dockerfile, docker/ or mapping/pom.xml changed
+#   2. image:  rebuild lod-am-pipeline only when Dockerfile, docker/, mapping/pom.xml or shacl/pom.xml changed
 #   3. fetch snapshot changed: Zotero, the live database (read-only role, PG* from .env), and
 #              the decision whether anything changed since the live release (out/run-decision.txt)
 #   4. release (only if something changed, or with --force), with RELEASE_STRICT=1 and
@@ -95,7 +95,7 @@ fi
 log "code at $(as_owner git rev-parse --short HEAD)"
 
 # 2. image
-inputs=$(cat Dockerfile .dockerignore docker/* mapping/pom.xml | sha256sum | cut -c1-16)
+inputs=$(cat Dockerfile .dockerignore docker/* mapping/pom.xml shacl/pom.xml | sha256sum | cut -c1-16)
 have=$(docker image inspect -f '{{ index .Config.Labels "net.lod-am.inputs" }}' "$IMAGE" 2>/dev/null || true)
 if [ "$have" != "$inputs" ]; then
   log "building $IMAGE (inputs $inputs)"
