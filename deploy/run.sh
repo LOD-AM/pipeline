@@ -49,6 +49,31 @@ checks_of() {
 
 exec 9> "${LODAM_LOCK:-/run/lodam-pipeline.lock}"
 flock -n 9 || { log "another run is still in progress; nothing to do"; exit 0; }
+
+# Containers of this run: a fixed name and a label each. When the run is stopped (systemctl stop, a
+# kill, Ctrl-C), its container is removed too: dockerd runs containers outside the unit, so a killed
+# docker client used to leave them running for days (two did until 2026-11-26). Under the lock no
+# other run is active, so any labelled container still there is a leftover of an earlier run.
+LABEL=net.lod-am.run=pipeline
+current=""
+cleanup() { if [ -n "$current" ]; then docker rm -f "$current" > /dev/null 2>&1 || true; fi; rm -f "${envf:-}"; }
+trap cleanup EXIT
+# then end by the signal itself, so that `systemctl stop` counts as a clean stop, not a failure mail
+stopped() { log "stopped ($1); removing ${current:-no} container"; cleanup; trap - "$1" EXIT; kill -s "$1" $$; }
+trap 'stopped TERM' TERM
+trap 'stopped INT' INT
+# docker run in the background + wait: bash runs the TERM trap only after a foreground command ends
+run_container() { # name, docker run arguments
+  current=lodam-pipeline-$1; shift
+  docker run --rm --name "$current" --label "$LABEL" "$@" & wait $!
+  local rc=$?; current=""; return $rc
+}
+leftovers=$(docker ps -aq --filter "label=$LABEL" || true)
+if [ -n "$leftovers" ]; then
+  log "removing $(wc -w <<< "$leftovers") container(s) left by an earlier, interrupted run"
+  # shellcheck disable=SC2086  # one container id per word
+  docker rm -f $leftovers > /dev/null
+fi
 [ -f .env ] || { log "FAIL: .env missing (see .env.example)"; exit 1; }
 
 # 1. code
@@ -79,9 +104,9 @@ if [ "$have" != "$inputs" ]; then
 fi
 
 # 3. snapshot and decision. Only the PG* lines of .env go into the container.
-envf=$(mktemp); trap 'rm -f "$envf"' EXIT
+envf=$(mktemp)
 grep -E '^PG[A-Z]+=' .env > "$envf" || true
-docker run --rm --network host --user "$IDS" --env-file "$envf" -v "$DIR:/work" "$IMAGE" fetch snapshot changed
+run_container fetch --network host --user "$IDS" --env-file "$envf" -v "$DIR:/work" "$IMAGE" fetch snapshot changed
 decision=$(cat out/run-decision.txt)
 # Copy out/release/ to LODAM_PUBLISH_DIR (world-readable, released data only), where the triplestore
 # fetches it (planning#7): out/ itself is owner-only. Returns 1 if not configured or already current.
@@ -114,7 +139,7 @@ fi
 log "$decision"
 
 # 4. release, offline
-docker run --rm --network none --user "$IDS" -e RELEASE_STRICT=1 -v "$DIR:/work" "$IMAGE" release
+run_container release --network none --user "$IDS" -e RELEASE_STRICT=1 -v "$DIR:/work" "$IMAGE" release
 sha=$(sha256sum out/release/manifest.json | cut -d' ' -f1)
 log "new release: out/release/ (manifest sha256 $sha); peak memory and time per step: out/internal/manifest.json"
 

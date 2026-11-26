@@ -25,6 +25,10 @@
    `{"manifest_sha256": …}`, never data. An unchanged run still hands over the live release if
    `LODAM_PUBLISH_DIR` is behind (e.g. just configured).
 
+Every container of a run has a fixed name (`lodam-pipeline-fetch`, `lodam-pipeline-release`) and the label
+`net.lod-am.run=pipeline`. A run that is stopped removes its container, and the next run removes any
+leftover one, so an interrupted run never keeps a container (and its memory) for days.
+
 A failing step ends the run with an error (`systemctl --failed` shows it) and mails the owner ([Alerts](#alerts-planning34)). `out/release/` is only
 ever replaced by a fully checked release. If nothing changed, the run ends after the snapshot
 (about a minute).
