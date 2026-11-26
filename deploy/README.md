@@ -2,8 +2,15 @@
 
 `deploy/run.sh`, started nightly by `lodam-pipeline.timer`:
 
-1. **Code:** fast-forward the checkout to `origin/main`. Only the owner merges there. A checkout
-   with local changes or off `main` is refused, so that every release matches a commit.
+1. **Code:** fast-forward the checkout to `origin/main`. Only the owner merges there, and `main` is
+   protected. A new commit is only taken once its check runs on GitHub passed (read from
+   `api.github.com`, as the triplestore's `update_kg.sh` does; planning review 2026-11-25, 5.2):
+   - checks failed: the run stops with an error, so the owner gets the failure mail, and the code
+     stays where it was;
+   - checks not finished yet, none yet, or GitHub not readable: this run uses the code it already
+     has, and the next run tries again.
+
+   A checkout with local changes or off `main` is refused, so that every release matches a commit.
 2. **Image:** rebuild `lod-am-pipeline` only when `Dockerfile`, `docker/` or `mapping/pom.xml`
    changed (an image label records which inputs it was built from).
 3. **`fetch snapshot changed`:** Zotero, a snapshot of the live database (read-only role, the `PG*`

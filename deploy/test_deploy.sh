@@ -11,6 +11,9 @@
 #      container has no network; a new commit on origin/main is fast-forwarded
 #   8. LODAM_PUBLISH_DIR gets each new release, world-readable, before the signal
 #   9. an unchanged run refreshes an outdated publish dir (and signals), leaves a current one alone
+#  10. a new commit on origin/main whose checks failed: not used, non-zero exit, nothing runs
+#  11. checks still running, or GitHub not readable: tonight's run uses the code it has
+#  12. the checks' answer is read in GitHub's compact form too
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SRC=$PWD
@@ -47,8 +50,31 @@ esac
 EOF
 cat > "$T/bin/curl" <<'EOF'
 #!/usr/bin/env bash
+# stub: the check runs of a commit on GitHub come from $CHECKS (a file; exit $CHECKS_EXIT),
+# every other call is the webhook
+if [[ "$*" == *check-runs* ]]; then
+  echo "curl $*" >> "$T/checks.log"; [ "${CHECKS_EXIT:-0}" = 0 ] || exit "$CHECKS_EXIT"
+  cat "${CHECKS:-$T/checks-passed.json}"; exit 0
+fi
 echo "curl $*" >> "$T/curl.log"
 EOF
+# Check-run answers in GitHub's format (abridged): the app and output objects have no status/conclusion
+run_json() { # status conclusion name
+  printf '    {\n      "id": %s,\n      "name": "%s",\n      "status": "%s",\n      "conclusion": %s,\n' "$RANDOM" "$3" "$1" "$2"
+  printf '      "output": { "title": null, "summary": null, "annotations_count": 0 },\n'
+  printf '      "app": { "slug": "github-actions", "owner": { "login": "github" }, "events": [] },\n'
+  printf '      "check_suite": { "id": 1 }, "pull_requests": []\n    }'
+}
+checks_file() { # file run...   each run as status:conclusion:name
+  local f=$1; shift; local first=1
+  { printf '{\n  "total_count": %s,\n  "check_runs": [\n' "$#"
+    for r in "$@"; do IFS=: read -r st co nm <<< "$r"; [ $first = 1 ] || printf ',\n'; first=0
+      run_json "$st" "$co" "$nm"; done
+    printf '\n  ]\n}\n'; } > "$f"
+}
+checks_file "$T/checks-passed.json" 'completed:"success":test-pipeline' 'completed:"success":image' 'completed:"skipped":shared-block'
+checks_file "$T/checks-failed.json" 'completed:"success":test-pipeline' 'completed:"failure":image' 'completed:"success":shared-block'
+checks_file "$T/checks-running.json" 'completed:"success":test-pipeline' 'in_progress:null:image'
 cat > "$T/bin/setpriv" <<'EOF'
 #!/usr/bin/env bash
 # stub: drop setpriv's options and run the command as is (the test does not run as root anyway)
@@ -58,7 +84,7 @@ chmod +x "$T/bin/"*
 export T PATH="$T/bin:$PATH" LODAM_LOCK="$T/lock"
 run() { (cd "$W" && bash deploy/run.sh "$@") > "$T/out.log" 2>&1; }
 calls() { grep -c "$1" "$T/$2" 2>/dev/null || true; }
-reset() { : > "$T/docker.log"; : > "$T/curl.log"; }
+reset() { : > "$T/docker.log"; : > "$T/curl.log"; : > "$T/checks.log"; }
 fail() { echo "FAIL $1"; cat "$T/out.log"; exit 1; }
 
 reset; DECISION="changed: no release yet" run || fail "1: run failed"
@@ -99,7 +125,8 @@ git clone -q "$T/origin.git" "$T/other" 2>/dev/null; echo "# new" >> "$T/other/D
 git -C "$T/other" -c user.name=t -c user.email=t@example.invalid commit -qam new; git -C "$T/other" -c push.negotiate=false push -q origin main
 reset; DECISION="unchanged: x" run || fail "7: run failed"
 [ "$(git -C "$W" rev-parse HEAD)" = "$(git -C "$T/other" rev-parse HEAD)" ] && [ "$(calls 'docker build' docker.log)" = 1 ] \
-  || fail "7: new commit on origin/main not fast-forwarded, or image not rebuilt for a changed Dockerfile"
+  && [ "$(calls "commits/$(git -C "$T/other" rev-parse HEAD)/check-runs" checks.log)" = 1 ] \
+  || fail "7: new commit on origin/main (checks passed) not fast-forwarded, or image not rebuilt for a changed Dockerfile"
 echo "ok   7 only PG* reach the container; origin/main fast-forwarded; image rebuilt when its inputs change"
 
 # 8. LODAM_PUBLISH_DIR: a new release is copied there (world-readable) and then signalled
@@ -116,3 +143,25 @@ cmp -s "$W/out/release/manifest.json" "$T/pub/manifest.json" && [ "$(calls 'mani
 reset; DECISION="unchanged: x" run || fail "9: run failed"
 [ "$(calls curl curl.log)" = 0 ] || fail "9: signalled although the publish dir was current"
 echo "ok   9 unchanged: outdated publish dir refreshed and signalled; current one left alone"
+
+# 10.-12. new code only once its checks on GitHub passed (planning review 2026-11-25, 5.2)
+newcommit() { echo "# $1" >> "$T/other/docker/README.md"; git -C "$T/other" -c user.name=t -c user.email=t@example.invalid commit -qam "$1"
+  git -C "$T/other" -c push.negotiate=false push -q origin main; }
+here() { git -C "$W" rev-parse HEAD; }
+before=$(here); newcommit failed; reset
+if CHECKS="$T/checks-failed.json" DECISION="changed: x" run; then fail "10: ran a main whose checks failed"; fi
+[ "$(here)" = "$before" ] && [ "$(calls 'docker run' docker.log)" = 0 ] && grep -q "checks on GitHub failed" "$T/out.log" \
+  || fail "10: main with failed checks was used, or Docker ran"
+echo "ok  10 checks failed: main not used, non-zero exit, nothing runs"
+
+reset; CHECKS="$T/checks-running.json" DECISION="unchanged: x" run || fail "11: run failed while checks were running"
+[ "$(here)" = "$before" ] && [ "$(calls 'docker run' docker.log)" -ge 1 ] && grep -q "not finished or not readable" "$T/out.log" \
+  || fail "11: checks running: expected the run on the old code"
+reset; CHECKS_EXIT=22 DECISION="unchanged: x" run || fail "11: run failed while GitHub was not readable"
+[ "$(here)" = "$before" ] && [ "$(calls 'docker run' docker.log)" -ge 1 ] || fail "11: GitHub not readable: expected the run on the old code"
+echo "ok  11 checks running or GitHub not readable: the run uses the code it has"
+
+tr -d ' \n' < "$T/checks-passed.json" > "$T/checks-compact.json"
+reset; CHECKS="$T/checks-compact.json" DECISION="unchanged: x" run || fail "12: run failed"
+[ "$(here)" = "$(git -C "$T/other" rev-parse HEAD)" ] || fail "12: compact JSON with passed checks: main not fast-forwarded"
+echo "ok  12 GitHub's compact JSON: passed checks, main fast-forwarded"

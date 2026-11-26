@@ -59,7 +59,7 @@ the graph: say which triples change and why in the PR.
   `{"manifest_sha256"}`) → the triplestore pulls with rsync over SSH (`rrsync -ro`, LOD-AM/triplestore
   `scripts/update_published.sh`), loads it and hands it to the website as a "Data release" PR. Peak memory
   1.27 GB (SHACL), a run takes ~40 min. Exports use knowledge-graph's canonical prefixes (#14), so the same
-  triples give the same file. Still to confirm (planning#33): a run with nothing new ends with `unchanged`.
+  triples give the same file. A run with nothing new ends with `unchanged` (confirmed, planning#33).
 - Alerts on failure (planning#34): `deploy/alert.sh` via `OnFailure=lodam-alert@%n` in `lodam-pipeline.service`
   (curl SMTP, `LODAM_ALERT_*` in `.env`; identical copy in LOD-AM/triplestore). Live and tested by the owner (2026-11-22).
 - Database overhaul (planning#27): the views follow ingest's schema rounds; each round is checked with `make baseline` /
@@ -72,6 +72,9 @@ the graph: say which triples change and why in the PR.
   number (`lodam_rdf.reported`); no internal id reaches the RDF. Full graph `9dce1017…` (the owner's corrections in
   the same dump: `3205a088…` with the old views). Fixture rebuilt. All rounds of planning#27 done once it is deployed.
   Since 2026-11-23 CI runs a whole release on the fixture (planning#36); rebuild it after every schema round.
+- `main` protected (owner, 2026-11-26; required checks `test-pipeline`, `image`, `shared-block`), and
+  `deploy/run.sh` takes a new `main` only once its check runs on GitHub passed (planning review
+  2026-11-25, 5.2; `test_deploy.sh` 10–12).
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
