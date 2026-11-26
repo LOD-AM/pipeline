@@ -62,6 +62,10 @@ approaches the LXC's RAM, give it more (README "Memory").
 whole setup, including the read-only `lodam-release` account, is in the triplestore README
 ("Releases"). Without them, releases are still built, just not handed over.
 
+## The database itself
+The research database runs in its own Docker stack on the same LXC: [`database/`](database/README.md)
+(PostgreSQL 16 + PostGIS, daily dumps, pgAdmin, Watchtower at 12:00).
+
 ## Alerts (planning#34)
 `lodam-pipeline.service` has `OnFailure=lodam-alert@%n.service`: a failed run (a failed check, the
 snapshot, the build, or a webhook that did not answer) starts `deploy/alert.sh`, which mails the

@@ -29,6 +29,16 @@ updates:
     schedule:
       interval: weekly
     labels: ["dependency-updates"]
+  - package-ecosystem: docker-compose  # deploy/database/docker-compose.yml (the research database's stack)
+    directory: "/deploy/database"
+    schedule:
+      interval: monthly
+    labels: ["dependency-updates"]
+    ignore:
+      # Watchtower already follows the floating tags within their line (16-3.6, pgAdmin 9); a PR is
+      # only wanted for Watchtower's own pin, and never PostgreSQL 17+ (the pipeline's pg_dump is 16)
+      - dependency-name: "postgis/postgis"
+      - dependency-name: "dpage/pgadmin4"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

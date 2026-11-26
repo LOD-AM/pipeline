@@ -1,0 +1,92 @@
+# Database stack on the data LXC (LOD-AM): the research database, its daily dumps, pgAdmin and
+# Watchtower. Secrets and settings come from .env (template: .env.example), never from this file.
+#
+# PostgreSQL stays on major version 16: the pipeline's pg_dump is 16, and pg_dump can't dump a
+# newer server (planning#26). The tag 16-3.6 follows PostgreSQL 16.x and PostGIS 3.6.x, the same
+# line as the pipeline image (postgis/postgis:16-3.6), so Watchtower brings minor updates only.
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    image: postgis/postgis:16-3.6
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      # a new volume: the old kartoza volume (postgis-data) stays untouched for a rollback
+      - pgdata16:/var/lib/postgresql/data
+    ports:
+      # Only this LXC reaches the database directly (the pipeline: PGHOST=127.0.0.1); pgAdmin
+      # reaches it over the compose network. Set DB_BIND=0.0.0.0 in .env only if a desktop client
+      # in the LAN must connect directly.
+      - "${DB_BIND:-127.0.0.1}:5432:5432"
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging: *logging
+
+  # Daily dumps into ./backups (02:30, before the pipeline's 03:17 run): roles plus every database
+  # in pg_dump's custom format, kept BACKUP_KEEP_DAYS days. Same image as the database, so no extra
+  # vendor; ./backups is a plain folder, easy to copy off the machine.
+  backup:
+    image: postgis/postgis:16-3.6
+    entrypoint: ["bash", "/backup.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_TIME: ${BACKUP_TIME:-02:30}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?set PGADMIN_DEFAULT_EMAIL in .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?set PGADMIN_DEFAULT_PASSWORD in .env}
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_BIND:-0.0.0.0}:80:80"     # the LAN (never a proxy host or port forward)
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+  # Updates the tags above within their line (16.x / PostGIS 3.6.x, pgAdmin 9.x) once a day at
+  # 12:00, not at night: the pipeline runs at 03:17 and the backup at 02:30.
+  watchtower:
+    image: nickfedor/watchtower:1.24.2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_SCHEDULE: "0 0 12 * * *"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_NOTIFICATIONS: email
+      WATCHTOWER_NOTIFICATION_EMAIL_FROM: ${WATCHTOWER_NOTIFICATION_EMAIL_FROM}
+      WATCHTOWER_NOTIFICATION_EMAIL_TO: ${WATCHTOWER_NOTIFICATION_EMAIL_TO}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER: ${WATCHTOWER_NOTIFICATION_EMAIL_SERVER}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: ${WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: ${WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: ${WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD}
+      WATCHTOWER_NOTIFICATION_EMAIL_DELAY: "2"
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  pgdata16:
+  pgadmin-data:
