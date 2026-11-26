@@ -76,6 +76,9 @@ the graph: say which triples change and why in the PR.
 - `main` protected (owner, 2026-11-26; required checks `test-pipeline`, `image`, `shared-block`), and
   `deploy/run.sh` takes a new `main` only once its check runs on GitHub passed (planning review
   2026-11-25, 5.2; `test_deploy.sh` 10–12).
+- The research database runs the stack in `deploy/database/` since 2026-11-26 (owner; `postgis/postgis:16-3.6`,
+  migrated from the frozen `kartoza/postgis:16-3.4`, i.e. 16.2): the next full graph had the same `canonical_sha256`
+  `9dce1017…`. Its README has the migration as it worked (peer login for the dump, passwords re-set).
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.
