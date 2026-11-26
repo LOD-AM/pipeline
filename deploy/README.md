@@ -11,7 +11,7 @@
      has, and the next run tries again.
 
    A checkout with local changes or off `main` is refused, so that every release matches a commit.
-2. **Image:** rebuild `lod-am-pipeline` only when `Dockerfile`, `docker/` or `mapping/pom.xml`
+2. **Image:** rebuild `lod-am-pipeline` only when `Dockerfile`, `docker/`, `mapping/pom.xml` or `shacl/pom.xml`
    changed (an image label records which inputs it was built from).
 3. **`fetch snapshot changed`:** Zotero, a snapshot of the live database (read-only role, the `PG*`
    lines of `.env`, and nothing else from `.env`), then the decision: has anything changed since the
@@ -24,6 +24,10 @@
    that the triplestore fetches the release from there (planning#7). The signal carries only
    `{"manifest_sha256": …}`, never data. An unchanged run still hands over the live release if
    `LODAM_PUBLISH_DIR` is behind (e.g. just configured).
+
+Every container of a run has a fixed name (`lodam-pipeline-fetch`, `lodam-pipeline-release`) and the label
+`net.lod-am.run=pipeline`. A run that is stopped removes its container, and the next run removes any
+leftover one, so an interrupted run never keeps a container (and its memory) for days.
 
 A failing step ends the run with an error (`systemctl --failed` shows it) and mails the owner ([Alerts](#alerts-planning34)). `out/release/` is only
 ever replaced by a fully checked release. If nothing changed, the run ends after the snapshot

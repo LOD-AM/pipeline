@@ -26,7 +26,7 @@ measure "export" python3 scripts/export_publication.py "$BUILD/lod-am.ttl" --eac
 
 for key in $keys; do
   measure "check_terms $key" python3 "$KG/tools/check_terms.py" "$OUTDIR/$key.tmp.ttl"
-  if ! measure "shacl $key" python3 "$KG/tools/validate.py" "$OUTDIR/$key.tmp.ttl" "$KG/data/vocab" > "$OUTDIR/$key.shacl"; then
+  if ! measure "shacl $key" python3 scripts/shacl.py "$OUTDIR/$key.tmp.ttl" "$KG/data/vocab" > "$OUTDIR/$key.shacl"; then
     grep -v '^warning:' "$OUTDIR/$key.shacl" | head -40; echo "FAIL: SHACL violations in $key" >&2; exit 1
   fi
   tail -1 "$OUTDIR/$key.shacl"

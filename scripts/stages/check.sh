@@ -9,8 +9,8 @@ db_up
 rm -f "$BUILD/checks.json"
 measure check_terms python3 "$KG/tools/check_terms.py" "$BUILD/lod-am.ttl"
 # The local concepts (:name_as_reported, :location_area, :not_detected …) live in knowledge-graph
-# One run (pySHACL takes several minutes on the full graph); warnings are counted, violations fail
-if ! measure shacl python3 "$KG/tools/validate.py" "$BUILD/lod-am.ttl" "$KG/data/vocab" > "$BUILD/shacl.txt"; then
+# Jena's validator (scripts/shacl.py; pySHACL took 34 minutes on the full graph); warnings are counted, violations fail
+if ! measure shacl python3 scripts/shacl.py "$BUILD/lod-am.ttl" "$KG/data/vocab" > "$BUILD/shacl.txt"; then
   grep -v '^warning:' "$BUILD/shacl.txt" | head -40; echo "FAIL: SHACL violations (out/.build/shacl.txt)" >&2; exit 1
 fi
 tail -1 "$BUILD/shacl.txt"

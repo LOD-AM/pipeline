@@ -58,8 +58,7 @@ the graph: say which triples change and why in the PR.
 - Chain live since 2026-11-22 (planning#3): nightly run 03:17 → `deploy/run.sh` copies each release to
   `LODAM_PUBLISH_DIR` (/srv/lodam/release, world-readable) → webhook POST /lodam-release (bearer token,
   `{"manifest_sha256"}`) → the triplestore pulls with rsync over SSH (`rrsync -ro`, LOD-AM/triplestore
-  `scripts/update_published.sh`), loads it and hands it to the website as a "Data release" PR. Peak memory
-  1.27 GB (SHACL), a run takes ~40 min. Exports use knowledge-graph's canonical prefixes (#14), so the same
+  `scripts/update_published.sh`), loads it and hands it to the website as a "Data release" PR. Exports use knowledge-graph's canonical prefixes (#14), so the same
   triples give the same file. A run with nothing new ends with `unchanged` (confirmed, planning#33).
 - Alerts on failure (planning#34): `deploy/alert.sh` via `OnFailure=lodam-alert@%n` in `lodam-pipeline.service`
   (curl SMTP, `LODAM_ALERT_*` in `.env`; identical copy in LOD-AM/triplestore). Live and tested by the owner (2026-11-22).
@@ -79,6 +78,10 @@ the graph: say which triples change and why in the PR.
 - The research database runs the stack in `deploy/database/` since 2026-11-26 (owner; `postgis/postgis:16-3.6`,
   migrated from the frozen `kartoza/postgis:16-3.4`, i.e. 16.2): the next full graph had the same `canonical_sha256`
   `9dce1017…`. Its README has the migration as it worked (peer login for the dump, passwords re-set).
+- SHACL with Jena 5.6.0 (`scripts/shacl.py`, jars from `shacl/pom.xml`; planning review 2026-11-25, section 6) instead of
+  pySHACL, which took 34 of the 38 minutes of a run on the LXC and 1.3 GB: locally 13 s and 0.53 GB on the full graph (Java 17),
+  the same results (graph `9dce1017…`, 0 violations, 2,097 warnings). `make test-fixture` check 4 compares both.
+  Peak memory of a run is now `check_terms` (~0.8 GB). Jena 6 needs Java 21; the image stays on Java 17 for Ontop.
 
 ## LOD-AM project (shared block: keep identical in every repo)
 Source of truth: knowledge-graph `CLAUDE.md`. Edit it there first, then copy it unchanged; CI (`scripts/check_shared_block.sh`) fails on drift.

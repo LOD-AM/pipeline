@@ -5,7 +5,10 @@
 #   1. the release holds exactly published/<key>.ttl and the manifest;
 #   2. that file is the same graph as tests/fixture/<key>/expected.ttl (= the file the server released);
 #   3. the full graph built from the fixture has no triple outside that file: the fixture holds
-#      nothing that is not already public (pipeline CLAUDE.md, Confidentiality).
+#      nothing that is not already public (pipeline CLAUDE.md, Confidentiality);
+#   4. Jena's SHACL check (scripts/shacl.py, used by the stages) finds the same results as
+#      knowledge-graph's pySHACL (tools/validate.py) on the fixture's full graph: the same severity,
+#      focus node and path for every result, and the same triple count (messages may be worded differently).
 # A converter change that changes the released file fails 2: update expected.ttl in the same PR and
 # say which triples change and why. A schema round of the database: rebuild the fixture.
 # Needs what `make release` needs (in the image: everything). Env: KEY (default hauptmann2002chemical).
@@ -18,7 +21,9 @@ FX=$ROOT/tests/fixture/$KEY
 for f in dump.sql zotero.json zotero.version expected.ttl; do
   [ -s "$FX/$f" ] || { echo "FAIL: $FX/$f missing" >&2; exit 1; }
 done
+KG=$(realpath "${KG:-../knowledge-graph}"); export KG   # absolute: make runs in a scratch copy
 export ONTOP_LIB=${ONTOP_LIB:-$ROOT/.cache/ontop/$(sha256sum mapping/pom.xml | cut -c1-16)}
+export JENA_LIB=${JENA_LIB:-$ROOT/.cache/jena/$(sha256sum shacl/pom.xml | cut -c1-16)}
 export LODAM_PG_PORT=${LODAM_PG_PORT:-5495}
 
 T=$(mktemp -d)
@@ -29,7 +34,7 @@ cleanup() {
   rm -rf "$T"
 }
 trap cleanup EXIT
-cp -r Makefile mapping scripts "$T/"
+cp -r Makefile mapping shacl scripts "$T/"
 mkdir -p "$T/.cache/zotero" "$T/pg"
 [ "$(id -u)" = 0 ] && chmod 755 "$T" && chown postgres "$T/pg"
 cp "$FX/zotero.json" "$T/.cache/zotero/group-6765723.json"
@@ -69,3 +74,15 @@ if extra:
     sys.exit(f"FAIL 3: the fixture's full graph has {len(extra)} triple(s) that are not in the release")
 print(f"ok   3 the fixture's full graph ({len(full)} triples) is all in the released file ({len(pub)} triples)")
 PY
+
+# 4. Jena and pySHACL agree
+results() { grep -E '^(VIOLATION|warning):' "$1" | sed -E 's/^(\S+) (\S+) (\S*): .*/\1 \2 \3/' | sort; }
+count() { tail -1 "$1" | grep -oE '[0-9]+ triples'; }
+python3 scripts/shacl.py "$T/out/internal/lod-am.ttl" "$KG/data/vocab" > "$T/jena.txt" || true
+python3 "$KG/tools/validate.py" "$T/out/internal/lod-am.ttl" "$KG/data/vocab" > "$T/pyshacl.txt" || true
+if ! diff <(results "$T/pyshacl.txt") <(results "$T/jena.txt") > "$T/shacl.diff" \
+   || [ "$(count "$T/pyshacl.txt")" != "$(count "$T/jena.txt")" ]; then
+  head -20 "$T/shacl.diff"; tail -1 "$T/pyshacl.txt"; tail -1 "$T/jena.txt"
+  echo "FAIL 4: Jena's SHACL results differ from pySHACL's" >&2; exit 1
+fi
+echo "ok   4 Jena's SHACL check = pySHACL's ($(tail -1 "$T/jena.txt" | sed 's/^SHACL: //'))"

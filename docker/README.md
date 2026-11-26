@@ -19,10 +19,11 @@ database (`--network host` reaches Postgres on the same LXC), `release` neither.
 | PostgreSQL 16 + PostGIS 3.6 (Debian trixie) | `postgis/postgis:16-3.6` | digest in `Dockerfile` (Dependabot) |
 | Java 17 (Temurin JRE) | `17.0.20.1_1` | digest in `Dockerfile` (Dependabot) |
 | Ontop CLI, PostgreSQL JDBC | 5.5.0, 42.7.4 | `mapping/pom.xml` (Dependabot), fetched at build time |
+| Apache Jena command-line tools (SHACL validation) | 5.6.0 (6 needs Java 21) | `shacl/pom.xml` (Dependabot), fetched at build time |
 | Python 3.13 (Debian), rdflib, pyshacl + dependencies | 7.6.0, 0.40.2 | `docker/requirements.txt` with hashes (Dependabot) |
 | knowledge-graph tools, shapes, vocabularies + ontology files | commit `KG_COMMIT` | `Dockerfile` (bump by hand, in its own PR) |
 
-**No data:** the build context is only `docker/` and `mapping/pom.xml` (`.dockerignore`). Snapshots,
+**No data:** the build context is only `docker/`, `mapping/pom.xml` and `shacl/pom.xml` (`.dockerignore`). Snapshots,
 the Zotero snapshot and `out/` stay in the mounted checkout, so the image can be published without
 exposing the database.
 

@@ -2,3 +2,4 @@
 *
 !docker/
 !mapping/pom.xml
+!shacl/pom.xml
