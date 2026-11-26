@@ -1,5 +1,6 @@
 out/
 .cache/
 .env
+deploy/database/backups/
 *.pyc
 __pycache__/

@@ -146,7 +146,8 @@ strings, `released_on` and a feature's name as recorded.
 - `scripts/compare_graphs.py`: two full graphs, same or what changed (schema rounds, planning#27)
 - `Makefile`, `scripts/stages/`: the stages (`measure.py` records memory and time, `changed.py` decides whether
   a scheduled run needs a release); `scripts/`: Zotero, literature, source-row test, publication export
-- `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`)
+- `deploy/`: the scheduled run on the data LXC (`run.sh`, systemd units, `install.sh`, `test_deploy.sh`);
+  `deploy/database/`: the research database's own Docker stack (compose file, daily dumps, migration steps)
 - `mapping/`: SQL views + R2RML ([`mapping/README.md`](mapping/README.md)), `pom.xml` (Ontop)
 - `Dockerfile`, `docker/`: the build image ([`docker/README.md`](docker/README.md))
 - `tests/fixture/`, `scripts/make_fixture.py`, `scripts/test_fixture.sh`: the public CI fixture (above)

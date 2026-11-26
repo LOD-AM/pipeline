@@ -23,8 +23,9 @@ as a fresh start without ingest's history (that history contains the database du
 make test-pipeline                                   # package/publish rules, no database
 make test-deploy                                     # deploy/run.sh control flow (stubbed docker/curl)
 make test-fixture                                    # whole release on tests/fixture/ (needs `make fetch` outside the image)
-bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
-shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
+bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh deploy/database/*.sh docker/entrypoint.sh
+shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh deploy/database/*.sh docker/entrypoint.sh
+(cd deploy/database && cp .env.example .env && docker compose config -q; rm .env)   # database stack
 bash scripts/check_shared_block.sh                   # shared block vs knowledge-graph
 ```
 A full run needs a dump: `make fetch`, then `make release DUMP=<dump.sql> KG=../knowledge-graph`

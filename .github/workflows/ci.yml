@@ -29,8 +29,10 @@ jobs:
           python-version: "3.13"
       - run: "pip install --require-hashes --only-binary=:all: -r docker/requirements.txt"
       - run: make test-pipeline
-      - run: bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh
-      - run: shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh docker/entrypoint.sh   # preinstalled on ubuntu-latest
+      - run: bash -n scripts/*.sh scripts/stages/*.sh deploy/*.sh deploy/database/*.sh docker/entrypoint.sh
+      - run: shellcheck -S warning scripts/*.sh scripts/stages/*.sh deploy/*.sh deploy/database/*.sh docker/entrypoint.sh   # preinstalled on ubuntu-latest
+      - name: Database stack compose file is valid (template values only)
+        run: cd deploy/database && cp .env.example .env && docker compose config -q && rm .env
       - run: make test-deploy
 
   image:
