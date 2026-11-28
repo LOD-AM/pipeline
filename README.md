@@ -153,6 +153,12 @@ strings, `released_on` and a feature's name as recorded.
 - `tests/fixture/`, `scripts/make_fixture.py`, `scripts/test_fixture.sh`: the public CI fixture (above)
 - `.github/workflows/ci.yml`: tests and image build, **without data** (the database never reaches GitHub)
 
+## Releases and citing
+A GitHub release only when the output changes in substance: a schema round of the research
+database, or a converter change that alters the full graph's `canonical_sha256`. Not for nightly
+runs (owner, LOD-AM/planning#54). Zenodo archives each release and mints a version DOI;
+`CITATION.cff` has the metadata. Release manifests keep naming the exact pipeline commit.
+
 ## Licence
 [MIT](LICENSE). The data the pipeline produces is not part of this repository; external ontologies
 and vocabularies are subject to their own licences.
